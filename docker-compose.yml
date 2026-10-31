@@ -1,0 +1,60 @@
+# Production stack behind the shared production Traefik (HTTPS via the
+# configured certificate resolver). Never copy development hostnames here.
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+    networks: [proxy]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.tls=true
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.priority=100
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.service=${APP_SLUG:-boilerplate}-api
+      - traefik.http.middlewares.${APP_SLUG:-boilerplate}-api-compress.compress=true
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.middlewares=${APP_SLUG:-boilerplate}-api-compress
+      - traefik.http.services.${APP_SLUG:-boilerplate}-api.loadbalancer.server.port=5000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL:-/api}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.tls=true
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.priority=10
+      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.service=${APP_SLUG:-boilerplate}-web
+      - traefik.http.services.${APP_SLUG:-boilerplate}-web.loadbalancer.server.port=80
+
+  example-job:
+    profiles: ["jobs"]
+    build:
+      context: ./jobs/example
+    env_file: .env
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-proxy-net}

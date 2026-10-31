@@ -1,0 +1,6 @@
+.app-nav { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 16px; background: #101828; }
+.app-nav__brand { color: #fff; font-weight: 800; letter-spacing: -.02em; }
+.app-nav__actions { display: flex; align-items: center; gap: 14px; }
+.app-nav__actions a { color: #d0d5dd; font-size: .8rem; }
+.app-nav .app-button--text.p-button { color: #d0d5dd; }
+.app-content { max-width: 1100px; margin: 0 auto; padding: 16px; }

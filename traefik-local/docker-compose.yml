@@ -1,0 +1,21 @@
+# Fallback shared local Traefik. Start it ONLY when no other local Traefik is
+# already serving port 80 on the proxy network. If a sibling app's Traefik is
+# running, reuse it; a second proxy would fail to bind port 80.
+services:
+  traefik:
+    image: traefik:v3.0
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [proxy]
+
+networks:
+  proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-proxy-net}
