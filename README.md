@@ -1,4 +1,4 @@
-# Starter App
+# Beck's Clay Figures
 
 A barebones full-stack starter: React 18 + PrimeReact frontend, Flask API,
 PostgreSQL, shared Traefik routing, and Dockerized scheduled jobs. It carries
@@ -112,7 +112,7 @@ This repo is Docker-first for builds and local development.
 
 This app shares one local Traefik with sibling projects on the external
 `proxy-net` network. It routes **only** `DEV_APP_DOMAIN`
-(`boilerplate.localhost`), binds no host ports, and has unique `APP_SLUG` /
+(`becksclayfigures.localhost`), binds no host ports, and has unique `APP_SLUG` /
 `COMPOSE_PROJECT_NAME` values. Do not give it a bare `localhost` router: another
 app may already own that hostname. If you copy this starter for another app,
 change `APP_SLUG`, `COMPOSE_PROJECT_NAME`, and `DEV_APP_DOMAIN` first.
@@ -139,8 +139,8 @@ docker compose -f docker-compose.dev.yml up -d
 
 Open:
 
-- **Frontend** at http://boilerplate.localhost
-- **Backend health** at http://boilerplate.localhost/api/health
+- **Frontend** at http://becksclayfigures.localhost
+- **Backend health** at http://becksclayfigures.localhost/api/health
 
 ### Stop services
 
@@ -212,10 +212,10 @@ Before ending any test or build task:
 - Verify both routes through Traefik:
 
 ```bash
-docker ps -a --filter label=com.docker.compose.project=boilerplate \
+docker ps -a --filter label=com.docker.compose.project=becks-clay-figures \
   --format '{{.Names}}\t{{.Status}}\t{{.Label "com.docker.compose.service"}}'
-curl -sS -o /dev/null -w 'frontend=%{http_code}\n' http://boilerplate.localhost/
-curl -sS -o /dev/null -w 'backend=%{http_code}\n' http://boilerplate.localhost/api/health
+curl -sS -o /dev/null -w 'frontend=%{http_code}\n' http://becksclayfigures.localhost/
+curl -sS -o /dev/null -w 'backend=%{http_code}\n' http://becksclayfigures.localhost/api/health
 ```
 
 Remove only the exact one-off containers you identified. For real stray
@@ -420,7 +420,9 @@ Never commit `.env`.
 Production runs behind a Traefik instance with `web`, `websecure`, and the
 configured Let's Encrypt resolver. The backend runs Gunicorn; the frontend is a
 compiled SPA served by Nginx; `/api` has higher router priority and gzip
-compression.
+compression. Production is served at
+`https://becksclayfigures.gravvisoft.com`; its DNS record must resolve to the
+Traefik host before the first certificate request.
 
 ```bash
 cp .env.example .env    # set production values; chmod 600 .env
@@ -433,6 +435,7 @@ docker compose up -d
 Deployment checklist:
 
 - [ ] Unique slug, Compose project, proxy network, and domain values.
+- [ ] DNS for `becksclayfigures.gravvisoft.com` resolves to the production host.
 - [ ] Strong `APP_SECRET_KEY`; `.env` permissions restricted.
 - [ ] Database backup verified; pending migrations reviewed, applied, and `check_schema_migrations.py` passes.
 - [ ] Backend, frontend, job, and shell tests pass.
@@ -456,4 +459,3 @@ Deployment checklist:
 - **Frontend:** React 18, React Router 6, PrimeReact 10, PrimeIcons 6, PrimeFlex 3, Create React App 5
 - **Backend:** Flask 3, Flask-CORS, psycopg2, PyJWT, Gunicorn, pytest
 - **Infrastructure:** Docker Compose, Traefik v3, Nginx, PostgreSQL
-# fathers_properties_boilerplate

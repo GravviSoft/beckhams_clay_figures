@@ -1,5 +1,5 @@
 # Development stack. Joins the already-running shared Traefik on the external
-# proxy network and routes only DEV_APP_DOMAIN (boilerplate.localhost). It binds
+# proxy network and routes only DEV_APP_DOMAIN (becksclayfigures.localhost). It binds
 # no host ports and adds no bare `localhost` router, so it runs beside other
 # local apps on the same Traefik without colliding.
 services:
@@ -28,13 +28,13 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api-dev.rule=Host(`${DEV_APP_DOMAIN:-boilerplate.localhost}`) && PathPrefix(`/api`)
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api-dev.priority=100
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api-dev.service=${APP_SLUG:-boilerplate}-api-dev
-      - traefik.http.middlewares.${APP_SLUG:-boilerplate}-api-compress-dev.compress=true
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api-dev.middlewares=${APP_SLUG:-boilerplate}-api-compress-dev
-      - traefik.http.services.${APP_SLUG:-boilerplate}-api-dev.loadbalancer.server.port=5000
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclayfigures.localhost}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.priority=100
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.service=${APP_SLUG:-becks-clay-figures}-api-dev
+      - traefik.http.middlewares.${APP_SLUG:-becks-clay-figures}-api-compress-dev.compress=true
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.middlewares=${APP_SLUG:-becks-clay-figures}-api-compress-dev
+      - traefik.http.services.${APP_SLUG:-becks-clay-figures}-api-dev.loadbalancer.server.port=5000
 
   frontend:
     build:
@@ -64,11 +64,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web-dev.rule=Host(`${DEV_APP_DOMAIN:-boilerplate.localhost}`)
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web-dev.priority=10
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web-dev.service=${APP_SLUG:-boilerplate}-web-dev
-      - traefik.http.services.${APP_SLUG:-boilerplate}-web-dev.loadbalancer.server.port=3000
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclayfigures.localhost}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.priority=10
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.service=${APP_SLUG:-becks-clay-figures}-web-dev
+      - traefik.http.services.${APP_SLUG:-becks-clay-figures}-web-dev.loadbalancer.server.port=3000
 
   example-job:
     profiles: ["jobs"]

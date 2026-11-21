@@ -16,15 +16,15 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api`)
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.tls=true
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.priority=100
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.service=${APP_SLUG:-boilerplate}-api
-      - traefik.http.middlewares.${APP_SLUG:-boilerplate}-api-compress.compress=true
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-api.middlewares=${APP_SLUG:-boilerplate}-api-compress
-      - traefik.http.services.${APP_SLUG:-boilerplate}-api.loadbalancer.server.port=5000
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.rule=Host(`${APP_DOMAIN:-becksclayfigures.gravvisoft.com}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.tls=true
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.priority=100
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.service=${APP_SLUG:-becks-clay-figures}-api
+      - traefik.http.middlewares.${APP_SLUG:-becks-clay-figures}-api-compress.compress=true
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.middlewares=${APP_SLUG:-becks-clay-figures}-api-compress
+      - traefik.http.services.${APP_SLUG:-becks-clay-figures}-api.loadbalancer.server.port=5000
 
   frontend:
     build:
@@ -40,13 +40,13 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.rule=Host(`${APP_DOMAIN}`)
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.tls=true
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.priority=10
-      - traefik.http.routers.${APP_SLUG:-boilerplate}-web.service=${APP_SLUG:-boilerplate}-web
-      - traefik.http.services.${APP_SLUG:-boilerplate}-web.loadbalancer.server.port=80
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.rule=Host(`${APP_DOMAIN:-becksclayfigures.gravvisoft.com}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.tls=true
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.priority=10
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.service=${APP_SLUG:-becks-clay-figures}-web
+      - traefik.http.services.${APP_SLUG:-becks-clay-figures}-web.loadbalancer.server.port=80
 
   example-job:
     profiles: ["jobs"]
