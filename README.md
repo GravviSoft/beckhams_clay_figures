@@ -279,6 +279,7 @@ For production, back up first and review every pending file
 | POST | `/api/auth/register` | — | Create account (`409` if the email exists) |
 | POST | `/api/auth/login` | — | Bearer token for valid credentials |
 | GET | `/api/auth/me` | Bearer | Current user |
+| GET | `/api/figures` | Bearer | List the caller's clay figures and asset metadata |
 | GET/POST | `/api/items` | Bearer | List / create the caller's example items |
 | PATCH/DELETE | `/api/items/<id>` | Bearer | Update / delete the caller's item (`404` otherwise) |
 

@@ -160,3 +160,60 @@
 - Current blockers or risks: Exact CORS production origin should match the final deployed application hostname. Presigned URLs must be short-lived and refreshed before expiration.
 - Prevent next time: Choose public versus authenticated object access before enabling any R2 public-access control.
 - Important implementation decisions: Keep both Custom Domains and Public Development URL disabled for now; add CORS and private R2 API credentials when storage integration is implemented.
+
+# AI Used: ChatGPT
+
+- Final pre-migration clay schema review:
+  - Reason: Present the minimal `becks_clay` domain schema for product-owner review before writing or applying a migration.
+  - Investigation: Confirmed `.env` now contains `DB_SCHEMA=becks_clay` without reading or exposing any other environment values. Reconciled the requested character name, creation date, inspiration photo, gallery poster, interactive GLB, optional source model, R2 storage, and existing canonical user ownership.
+  - Root cause: The configurable namespace is ready, but the clay-domain tables have not yet been approved or created.
+  - Change made: Documentation/journal note only. Proposed two normalized tables: `becks_clay.figures` for the physical creation and `becks_clay.assets` for its R2-backed files. No migration or database change was made.
+  - Why this approach: Two tables keep the figure record small while allowing multiple semantically distinct file types without adding a new column whenever another asset type is introduced.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Confirmed only the `DB_SCHEMA` key in `.env` and checked relevant repository status.
+- Results: `DB_SCHEMA=becks_clay` is configured locally. Schema remains a proposal awaiting approval.
+- Current blockers or risks: Decide whether each figure may have only one asset of each type or multiple inspiration/source images; the minimal proposal allows one of each type.
+- Prevent next time: Review the exact SQL contract before generating and applying the migration.
+- Important implementation decisions: Proposed asset types are `inspiration_image`, `gallery_poster`, `display_model`, and `source_model`; PostgreSQL stores R2 object keys and metadata, never binary files or expiring signed URLs.
+
+# AI Used: ChatGPT
+
+- Apply clay gallery schema and add the first backend gallery slice:
+  - Reason: Create the approved figure/asset data model and give the upcoming gallery UI a real ownership-checked read endpoint.
+  - Investigation: Confirmed configured database keys without exposing values, attempted inspection through the stopped backend, then ran the read-only inspector in a one-off Docker container. The live `becks_clay` schema contained zero tables, so no applied migration history or data required preservation. Reviewed the existing domain-module, application-composition, API, test, and frontend workspace patterns.
+  - Root cause: The product had only the reusable boilerplate migrations and example domain; there was no canonical clay record, asset metadata, or gallery API.
+  - Change made: Added migration `002_clay_gallery.sql` with `figures` and `assets`; registered it in the canonical migration list; created the `clay_gallery` backend domain with an authenticated `GET /api/figures` endpoint scoped by `owner_user_id`; updated ownership/API documentation; added route coverage; applied migrations `001` and `002` to the configured database.
+  - Why this approach: A read-only vertical slice establishes the real source of truth and authorization boundary before UI work. Assets remain normalized and R2-backed, while the list query returns each figure with its asset metadata in one response.
+
+- Files touched:
+  - `backend/migrations/002_clay_gallery.sql`
+  - `backend/app_schema.py`
+  - `backend/app.py`
+  - `backend/domains/clay_gallery/README.md`
+  - `backend/domains/clay_gallery/__init__.py`
+  - `backend/domains/clay_gallery/repository.py`
+  - `backend/domains/clay_gallery/routes.py`
+  - `backend/domains/clay_gallery/service.py`
+  - `backend/domains/README.md`
+  - `backend/tests/test_clay_gallery_routes.py`
+  - `docs/architecture/domain-ownership.md`
+  - `README.md`
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied:
+  - Applied `001_initial_schema.sql`.
+  - Applied `002_clay_gallery.sql`.
+  - Created `becks_clay.figures`, `becks_clay.assets`, and the six platform/example tables from migration `001`.
+- Tests and verification commands run:
+  - Dockerized `python scripts/inspect_schema.py` before the change.
+  - Dockerized `pytest -q`.
+  - Dockerized `python scripts/apply_migrations.py --dry-run`.
+  - Dockerized `python scripts/apply_migrations.py`.
+  - Dockerized `python scripts/check_schema_migrations.py`.
+  - Dockerized `python scripts/inspect_schema.py` after applying.
+- Results: Backend suite passed with 34 tests. Dry run reported only migrations `001` and `002`. Both applied successfully; the ledger reports two matching migrations. Live inspection shows eight tables in `becks_clay`, including the approved `figures` and `assets` columns.
+- Current blockers or risks: Frontend work is paused until the operator explicitly confirms all live browser editors/forms are saved and closed, as required by the hot-reload safety rule. R2 object URL signing is not part of this first read-only slice, so the initial UI should use graceful placeholders until asset delivery is implemented.
+- Prevent next time: Establish the canonical domain records and authorization-scoped API before building a frontend around mock-only state.
+- Important implementation decisions: The gallery endpoint requires bearer authentication and never exposes another user's figures. The first UI will consume real empty/data states but will not invent upload persistence or public R2 URLs.

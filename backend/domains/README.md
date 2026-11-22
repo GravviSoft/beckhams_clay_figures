@@ -18,6 +18,7 @@ domains/<name>/
 Current domains:
 
 - `identity/` — canonical accounts, registration, sign-in.
+- `clay_gallery/` — clay figures and their R2-backed asset metadata.
 - `example_items/` — the replaceable reference domain.
 
 Rules:

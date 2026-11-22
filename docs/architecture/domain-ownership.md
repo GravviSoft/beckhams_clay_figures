@@ -7,6 +7,7 @@ domain here when it is created.
 |---|---|---|
 | Platform (`backend/core`) | Configuration, connections, error contract, token transport | `becks_clay.schema_migrations` |
 | Identity | Accounts, registration, sign-in | `becks_clay.users` |
+| Clay gallery | Clay creations and R2 asset metadata | `becks_clay.figures`, `becks_clay.assets` |
 | Example items | Replaceable reference workflow | `becks_clay.example_items` |
 | Data warehouse (jobs) | Source registry, run history, observations | `becks_clay.external_data_sources`, `becks_clay.external_data_runs`, `becks_clay.example_observations` |
 

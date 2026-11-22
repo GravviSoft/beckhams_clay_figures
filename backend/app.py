@@ -11,6 +11,7 @@ from core.auth import require_auth
 from core.config import Config
 from core.database import get_db
 from core.errors import register_error_handlers
+from domains.clay_gallery import create_clay_gallery_blueprint
 from domains.example_items import create_example_items_blueprint
 from domains.identity import create_identity_blueprint
 
@@ -27,6 +28,7 @@ def create_app(config_object=Config, *, db=get_db):
 
     register_blueprints(app, [
         create_identity_blueprint(get_db=db, require_auth=require_auth),
+        create_clay_gallery_blueprint(get_db=db, require_auth=require_auth),
         create_example_items_blueprint(get_db=db, require_auth=require_auth),
     ])
     return app

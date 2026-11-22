@@ -32,6 +32,7 @@ LEDGER_TABLE = "schema_migrations"
 # Ordered, append-only. Never edit or remove an entry that has been applied.
 MIGRATIONS = [
     "001_initial_schema.sql",
+    "002_clay_gallery.sql",
 ]
 
 
