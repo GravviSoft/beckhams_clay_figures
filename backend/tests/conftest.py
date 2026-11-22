@@ -8,6 +8,7 @@ class TestConfig:
     SECRET_KEY = "test-secret"
     AUTH_TOKEN_TTL_SECONDS = 60
     CONNECTION_STRING = ""
+    DB_SCHEMA = "test_app"
     CORS_ORIGINS = ["http://test.localhost"]
 
 

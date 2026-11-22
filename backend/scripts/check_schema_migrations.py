@@ -14,21 +14,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import psycopg2  # noqa: E402
 
 from app_schema import LEDGER_TABLE, checksum, migration_files  # noqa: E402
+from core.schema import database_schema, set_search_path  # noqa: E402
 
 
 def main():
     connection_string = os.getenv("CONNECTION_STRING", "").strip()
     if not connection_string:
         raise RuntimeError("CONNECTION_STRING is required.")
+    schema = database_schema()
     expected = {path.name: checksum(path) for path in migration_files()}
     connection = psycopg2.connect(connection_string)
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT to_regclass(%s)", (LEDGER_TABLE,))
+            set_search_path(cursor, schema)
+            cursor.execute("SELECT to_regclass(%s)", (f"{schema}.{LEDGER_TABLE}",))
             if not cursor.fetchone()[0]:
                 print(f"{LEDGER_TABLE} is missing; run scripts/apply_migrations.py first.")
                 return 1
-            cursor.execute(f"SELECT filename, checksum_sha256 FROM {LEDGER_TABLE}")
+            cursor.execute("SELECT filename, checksum_sha256 FROM schema_migrations")
             actual = dict(cursor.fetchall())
     finally:
         connection.close()

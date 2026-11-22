@@ -120,7 +120,7 @@ change `APP_SLUG`, `COMPOSE_PROJECT_NAME`, and `DEV_APP_DOMAIN` first.
 ### Standard local flow
 
 ```bash
-cp .env.example .env          # then set APP_SECRET_KEY and CONNECTION_STRING / DEV_CONNECTION_STRING
+cp .env.example .env          # then set DB_SCHEMA, APP_SECRET_KEY, and CONNECTION_STRING / DEV_CONNECTION_STRING
 ```
 
 Make sure a shared Traefik is serving port 80 (see [`traefik-local/README.md`](traefik-local/README.md)):
@@ -228,13 +228,23 @@ docker compose -f docker-compose.dev.yml up -d
 
 ## Schema Orientation
 
-All application tables live in the PostgreSQL `app` schema.
+All application tables live in the PostgreSQL `becks_clay` schema. Fully
+qualified relation names therefore use `becks_clay.*`; do not add new tables
+to the generic `app` or `public` schemas.
+
+The namespace is configured once with `DB_SCHEMA` in `.env`. It is deliberately
+separate from `APP_SLUG`: infrastructure slugs may contain hyphens and may be
+renamed, while PostgreSQL schemas use stable lowercase snake_case identifiers.
+The backend, jobs, and migration tools validate `DB_SCHEMA`, set it as their
+connection `search_path`, and keep ordinary SQL and migration files free of a
+hardcoded application schema. When copying this boilerplate, change
+`DB_SCHEMA`; do not search-and-replace SQL relation names.
 
 - Canonical snapshot: [`backend/app_schema.py`](backend/app_schema.py) composes
   every migration in order (`python app_schema.py --print-sql`).
 - Migrations: `backend/migrations/NNN_description.sql`, each wrapped in
   `BEGIN;` … `COMMIT;`, numbered, append-only.
-- Ledger: `app.schema_migrations` records each applied file and its SHA-256.
+- Ledger: `becks_clay.schema_migrations` records each applied file and its SHA-256.
 
 Inspect the live schema before database or query changes:
 
@@ -398,6 +408,7 @@ Full tree and responsibilities: [`docs/architecture/project-structure.md`](docs/
 |---|---|
 | `APP_SLUG` | Unique Traefik router/service prefix |
 | `COMPOSE_PROJECT_NAME` | Unique Compose project name |
+| `DB_SCHEMA` | Required stable PostgreSQL namespace in lowercase snake_case |
 | `TRAEFIK_NETWORK` | Shared external proxy network (`proxy-net`) |
 | `TRAEFIK_DEV_ENTRYPOINT` | Local HTTP entrypoint (`web`) |
 | `TRAEFIK_PROD_ENTRYPOINT` | Production HTTPS entrypoint |

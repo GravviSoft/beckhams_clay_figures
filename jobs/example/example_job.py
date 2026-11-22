@@ -32,11 +32,11 @@ def persist(connection, observations):
     with connection.cursor() as cursor:
         for row in observations:
             cursor.execute(
-                """INSERT INTO app.example_observations (source_key, observed_value, source_version, retrieved_at)
+                """INSERT INTO example_observations (source_key, observed_value, source_version, retrieved_at)
                    VALUES (%s, %s, %s, %s)
                    ON CONFLICT (source_key) DO UPDATE SET observed_value=EXCLUDED.observed_value,
                      source_version=EXCLUDED.source_version, retrieved_at=EXCLUDED.retrieved_at
-                   WHERE (app.example_observations.observed_value, app.example_observations.source_version)
+                   WHERE (example_observations.observed_value, example_observations.source_version)
                      IS DISTINCT FROM (EXCLUDED.observed_value, EXCLUDED.source_version)""",
                 (row.source_key, row.observed_value, row.source_version, row.retrieved_at),
             )

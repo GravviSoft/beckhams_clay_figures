@@ -1,6 +1,6 @@
 # Identity Domain
 
-Owns the canonical human account (`app.users`), password registration and
+Owns the canonical human account (`becks_clay.users`), password registration and
 sign-in, and the authenticated-actor lookup.
 
 ## Endpoints
@@ -13,7 +13,7 @@ sign-in, and the authenticated-actor lookup.
 
 ## Boundaries
 
-- One canonical account per person. Other domains reference `app.users.id`;
+- One canonical account per person. Other domains reference `becks_clay.users.id`;
   they never copy email or password data.
 - Token issue and verification live in the platform core (`core/auth.py`).
   This domain owns the account record and credential rules.

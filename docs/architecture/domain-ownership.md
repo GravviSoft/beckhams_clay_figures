@@ -5,10 +5,10 @@ domain here when it is created.
 
 | Domain | Owns | Canonical records |
 |---|---|---|
-| Platform (`backend/core`) | Configuration, connections, error contract, token transport | `app.schema_migrations` |
-| Identity | Accounts, registration, sign-in | `app.users` |
-| Example items | Replaceable reference workflow | `app.example_items` |
-| Data warehouse (jobs) | Source registry, run history, observations | `app.external_data_sources`, `app.external_data_runs`, `app.example_observations` |
+| Platform (`backend/core`) | Configuration, connections, error contract, token transport | `becks_clay.schema_migrations` |
+| Identity | Accounts, registration, sign-in | `becks_clay.users` |
+| Example items | Replaceable reference workflow | `becks_clay.example_items` |
+| Data warehouse (jobs) | Source registry, run history, observations | `becks_clay.external_data_sources`, `becks_clay.external_data_runs`, `becks_clay.example_observations` |
 
 ## Rules
 

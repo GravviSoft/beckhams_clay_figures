@@ -3,6 +3,18 @@ import pytest
 import run_example_job
 
 
+def test_database_schema_comes_from_validated_environment(monkeypatch):
+    monkeypatch.setenv("DB_SCHEMA", "becks_clay")
+    assert run_example_job.database_schema() == "becks_clay"
+
+
+@pytest.mark.parametrize("schema", ["", "becks-clay", "BecksClay", "2becks"])
+def test_database_schema_rejects_unsafe_names(monkeypatch, schema):
+    monkeypatch.setenv("DB_SCHEMA", schema)
+    with pytest.raises(RuntimeError, match="DB_SCHEMA"):
+        run_example_job.database_schema()
+
+
 class FakeCursor:
     def __init__(self, log):
         self.log = log

@@ -1,11 +1,26 @@
 import os
+import re
 import sys
 
 import psycopg2
+from psycopg2 import sql
 
 from example_job import collect, persist, validate
 
 DATASET_KEY = "example_dataset"
+SCHEMA_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+
+def database_schema():
+    schema = os.environ.get("DB_SCHEMA", "").strip()
+    if not SCHEMA_NAME_PATTERN.fullmatch(schema):
+        raise RuntimeError("DB_SCHEMA must be lowercase snake_case and no more than 63 characters.")
+    return schema
+
+
+def set_search_path(connection, schema):
+    with connection.cursor() as cursor:
+        cursor.execute(sql.SQL("SET search_path TO {}, public").format(sql.Identifier(schema)))
 
 
 def start_run(connection):
@@ -13,11 +28,11 @@ def start_run(connection):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            """INSERT INTO app.external_data_sources (dataset_key, name, update_frequency) VALUES (%s, %s, %s)
+            """INSERT INTO external_data_sources (dataset_key, name, update_frequency) VALUES (%s, %s, %s)
                ON CONFLICT (dataset_key) DO UPDATE SET name = EXCLUDED.name""",
             (DATASET_KEY, "Generic example dataset", "manual"),
         )
-        cursor.execute("INSERT INTO app.external_data_runs (dataset_key, status) VALUES (%s, 'running') RETURNING id", (DATASET_KEY,))
+        cursor.execute("INSERT INTO external_data_runs (dataset_key, status) VALUES (%s, 'running') RETURNING id", (DATASET_KEY,))
         run_id = cursor.fetchone()[0]
     connection.commit()
     return run_id
@@ -31,7 +46,7 @@ def run(connection):
         status = "success" if written else "unchanged"
         with connection.cursor() as cursor:
             cursor.execute(
-                """UPDATE app.external_data_runs SET status = %s, source_version = %s, rows_seen = %s,
+                """UPDATE external_data_runs SET status = %s, source_version = %s, rows_seen = %s,
                      rows_written = %s, finished_at = NOW() WHERE id = %s""",
                 (status, observations[0].source_version, len(observations), written, run_id),
             )
@@ -40,7 +55,7 @@ def run(connection):
         connection.rollback()
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE app.external_data_runs SET status = 'failed', message = %s, finished_at = NOW() WHERE id = %s",
+                "UPDATE external_data_runs SET status = 'failed', message = %s, finished_at = NOW() WHERE id = %s",
                 (str(error)[:1000], run_id),
             )
         connection.commit()
@@ -55,6 +70,7 @@ def main():
         raise RuntimeError("CONNECTION_STRING is required")
     connection = psycopg2.connect(connection_string)
     try:
+        set_search_path(connection, database_schema())
         run(connection)
         return 0
     finally:

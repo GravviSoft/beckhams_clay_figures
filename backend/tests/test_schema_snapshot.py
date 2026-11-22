@@ -14,10 +14,12 @@ def test_every_migration_is_transaction_wrapped():
 
 
 def test_composed_schema_is_one_transaction_with_the_ledger():
-    sql = app_schema.compose_schema_sql()
+    sql = app_schema.compose_schema_sql("test_app")
     assert sql.startswith("BEGIN;") and sql.endswith("COMMIT;")
     assert sql.count("COMMIT;") == 1
-    assert "app.schema_migrations" in sql
+    assert 'CREATE SCHEMA IF NOT EXISTS "test_app"' in sql
+    assert 'SET LOCAL search_path TO "test_app", public' in sql
+    assert "CREATE TABLE IF NOT EXISTS schema_migrations" in sql
 
 
 def test_plan_returns_only_unrecorded_migrations():

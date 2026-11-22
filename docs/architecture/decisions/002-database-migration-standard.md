@@ -6,7 +6,7 @@
 
 Database evolution uses numbered, append-only, BEGIN/COMMIT-wrapped SQL
 migrations. Each applied file is recorded with its SHA-256 checksum in
-`app.schema_migrations`. Applied migrations are never edited; corrections use a
+`becks_clay.schema_migrations`. Applied migrations are never edited; corrections use a
 new forward migration. The canonical schema snapshot (`backend/app_schema.py`)
 lists every migration in order.
 

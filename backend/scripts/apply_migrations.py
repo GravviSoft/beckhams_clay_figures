@@ -19,19 +19,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import psycopg2  # noqa: E402
+from psycopg2 import sql  # noqa: E402
 
 from app_schema import LEDGER_TABLE, MIGRATIONS, checksum, load_additive_schema_migration, migration_files  # noqa: E402
+from core.schema import database_schema, set_search_path  # noqa: E402
 
-BOOTSTRAP_LEDGER_SQL = f"""
-CREATE SCHEMA IF NOT EXISTS app;
-CREATE TABLE IF NOT EXISTS {LEDGER_TABLE} (
-    filename TEXT PRIMARY KEY,
-    checksum_sha256 TEXT NOT NULL,
-    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    applied_by TEXT NOT NULL DEFAULT current_user,
-    notes TEXT
-);
-"""
+
+def bootstrap_ledger(cursor, schema):
+    cursor.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(sql.Identifier(schema)))
+    set_search_path(cursor, schema)
+    cursor.execute(
+        """CREATE TABLE IF NOT EXISTS schema_migrations (
+               filename TEXT PRIMARY KEY,
+               checksum_sha256 TEXT NOT NULL,
+               applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+               applied_by TEXT NOT NULL DEFAULT current_user,
+               notes TEXT
+           )"""
+    )
 
 
 def plan(expected, recorded):
@@ -57,13 +62,14 @@ def main():
     if not connection_string:
         raise SystemExit("CONNECTION_STRING is required")
 
+    schema = database_schema()
     expected = {path.name: checksum(path) for path in migration_files()}
     connection = psycopg2.connect(connection_string)
     try:
         with connection.cursor() as cursor:
-            cursor.execute(BOOTSTRAP_LEDGER_SQL)
+            bootstrap_ledger(cursor, schema)
             connection.commit()
-            cursor.execute(f"SELECT filename, checksum_sha256 FROM {LEDGER_TABLE}")
+            cursor.execute("SELECT filename, checksum_sha256 FROM schema_migrations")
             recorded = dict(cursor.fetchall())
 
         pending = plan(expected, recorded)
@@ -76,9 +82,10 @@ def main():
                 continue
             try:
                 with connection.cursor() as cursor:
+                    set_search_path(cursor, schema)
                     cursor.execute(load_additive_schema_migration(filename))
                     cursor.execute(
-                        f"INSERT INTO {LEDGER_TABLE} (filename, checksum_sha256, notes) VALUES (%s, %s, %s)",
+                        "INSERT INTO schema_migrations (filename, checksum_sha256, notes) VALUES (%s, %s, %s)",
                         (filename, expected[filename], "Applied by scripts/apply_migrations.py"),
                     )
                 connection.commit()

@@ -12,7 +12,7 @@ Every scheduled job is a small, independently buildable Docker service under `jo
 - `failed`: blocking error recorded after rolling back the partial work; original exit code is preserved
 
 One `dataset_key` = one upstream file/grain/cadence = one source registry row
-(`app.external_data_sources`) = one run history (`app.external_data_runs`) = one
+(`becks_clay.external_data_sources`) = one run history (`becks_clay.external_data_runs`) = one
 schedule decision. One runner may pull several datasets when the extraction
 logic is shared, but each keeps its own key and run history.
 

@@ -8,17 +8,22 @@ from memory or the checked-in snapshot alone.
 
 import argparse
 import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import psycopg2
 import psycopg2.extras
 
-DEFAULT_SCHEMAS = ["app"]
+from core.schema import database_schema
 
 
 def main():
     parser = argparse.ArgumentParser(description="Inspect live schemas, tables, and columns.")
-    parser.add_argument("--schemas", nargs="+", default=DEFAULT_SCHEMAS, help="Schemas to inspect (default: app).")
+    parser.add_argument("--schemas", nargs="+", help="Schemas to inspect (default: DB_SCHEMA).")
     args = parser.parse_args()
+    schemas = args.schemas or [database_schema()]
 
     connection_string = os.getenv("CONNECTION_STRING", "").strip()
     if not connection_string:
@@ -26,7 +31,7 @@ def main():
     connection = psycopg2.connect(connection_string, cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         with connection.cursor() as cursor:
-            for schema in args.schemas:
+            for schema in schemas:
                 cursor.execute(
                     """SELECT table_name FROM information_schema.tables
                        WHERE table_schema = %s AND table_type = 'BASE TABLE' ORDER BY table_name""",

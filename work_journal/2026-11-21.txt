@@ -1,0 +1,162 @@
+# AI Used: ChatGPT
+
+- Beck's clay gallery schema and 3D UI brainstorming:
+  - Reason: Define a simple data model and identify a practical frontend toolset for a polished, interactive gallery of Beck's clay figures before implementation.
+  - Investigation: Read the root README end-to-end, read the journal standard, checked the journal directory for recent dated entries, inspected the canonical schema composer and all current migrations, listed the current backend/frontend domain structure, and reviewed `frontend/package.json`. The requested `backend/rentals_app_schema.py` does not belong to this project; after clarification, reviewed `backend/app_schema.py` and `backend/migrations/001_initial_schema.sql` instead. Also checked current official documentation for `<model-viewer>`, Three.js GLTFLoader, and React Three Fiber compatibility with React 18.
+  - Root cause: The project is still using its replaceable example domain and has no clay-figure domain or schema yet. There were no prior dated journal entries in this newly initialized app.
+  - Change made: Added this investigation and planning journal entry only. No schema, migration, backend, frontend, dependency, or database changes were made.
+  - Why this approach: The project requires evidence-first design and discussion before implementation. Keeping this phase conceptual avoids prematurely committing to file storage, access control, or 3D rendering choices.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Read `README.md` in full.
+  - Read `work_journal/README.md` and listed existing journal files.
+  - Read `backend/app_schema.py` and `backend/migrations/001_initial_schema.sql`.
+  - Checked `git status --short` before editing; the worktree was clean.
+- Results: Confirmed Docker-only npm policy, `app` as the database schema, append-only numbered migrations, and `backend/app_schema.py` as the canonical schema composer. Confirmed no dated journal history exists yet.
+- Current blockers or risks: Storage provider and upload limits are undecided; model format and capture/processing workflow need agreement before implementation. High-polygon phone scans may be too large for a smooth web gallery without optimization.
+- Prevent next time: Use the canonical `backend/app_schema.py` name from this repository when requesting schema review.
+- Important implementation decisions: Discussion phase only. The leading design is one `app.becks_clay` row per physical figure, an optimized GLB display model plus poster image in object storage, and storage keys/metadata in PostgreSQL. `<model-viewer>` is the preferred simple first viewer; React Three Fiber remains the higher-control option if the screenshot-like studio experience requires a custom scene. Proposed schema and package choices remain subject to product-owner approval.
+
+# AI Used: ChatGPT
+
+- Clay schema refinement and R2 storage boundary:
+  - Reason: Refine the proposed data model to include the photo or artwork that inspired each clay figure and decide whether the project should have a dedicated Cloudflare R2 bucket.
+  - Investigation: Rechecked the repository's mandatory `app` PostgreSQL schema rule and reviewed current official Cloudflare R2 documentation for buckets, public access, custom domains, CORS, presigned URLs, and storage classes.
+  - Root cause: The first proposal modeled only the rendered model, its original source, and its poster thumbnail; it omitted the distinct inspiration image. The requested `becks_clay` naming is ambiguous between a PostgreSQL schema and table name and conflicts with the current repository rule if intended as a new PostgreSQL schema.
+  - Change made: Updated the planning recommendation only: add an `inspiration_image_storage_key` and optional inspiration caption/credit; use a dedicated private R2 bucket with per-asset key prefixes; upload through short-lived presigned URLs and serve either with authorized reads or a deliberate public custom domain. No application, schema, migration, R2, or environment changes were made.
+  - Why this approach: A dedicated bucket isolates lifecycle, CORS, credentials, and accidental exposure from unrelated projects. Separate storage keys preserve the semantic difference between the inspiration image, gallery poster, web-ready GLB, and original scan.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Reviewed official Cloudflare R2 documentation for CORS, public buckets, presigned URLs, pricing, limits, and storage classes.
+- Results: Confirmed R2 is S3-compatible, supports browser uploads using presigned URLs plus a matching CORS policy, and can serve public assets through a custom domain. Confirmed `r2.dev` is intended for non-production traffic.
+- Current blockers or risks: Product owner must confirm whether `becks_clay` means the table name inside the required `app` schema or a deliberate replacement/new PostgreSQL schema. Gallery privacy must also be decided before choosing public versus signed reads.
+- Prevent next time: Distinguish database schema names, table names, and object-storage bucket names explicitly in design discussions.
+- Important implementation decisions: Recommend a new dedicated R2 bucket and R2 Standard storage. Keep the bucket private during development; never expose R2 credentials to the browser. Store only opaque object keys and file metadata in PostgreSQL.
+
+# AI Used: ChatGPT
+
+- PostgreSQL application namespace clarification:
+  - Reason: Ensure this application's tables are immediately identifiable in a shared PostgreSQL database containing tables from many applications.
+  - Investigation: Clarified that `becks_clay` is intended to be the PostgreSQL schema namespace, analogous to an existing `rentals` namespace, rather than only the name of one table.
+  - Root cause: The starter boilerplate's generic `app` schema rule is not descriptive enough in the owner's shared database and the earlier proposal interpreted `becks_clay` only as the table name.
+  - Change made: Updated the planning decision: this application should use the PostgreSQL schema `becks_clay`. Recommend domain-specific table names beneath it, especially `becks_clay.figures` and `becks_clay.assets`, rather than the redundant `becks_clay.becks_clay`. No schema or code changes were made yet.
+  - Why this approach: A project-specific schema makes ownership obvious in database administration and gives the application room for additional tables without mixing them into a generic namespace. Separating figures from assets also models multiple photos and 3D files without adding one column per future asset type.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run: None; this was a clarified architecture decision during schema brainstorming.
+- Results: PostgreSQL namespace intent is now clear: use `becks_clay.*` for this application's tables.
+- Current blockers or risks: Before implementation, inspect the live schema to determine whether the starter's `app` migration has already been applied. The migration strategy differs between an unused blank database and an applied schema with data.
+- Prevent next time: Name both parts of proposed relations explicitly as `<postgres_schema>.<table>`.
+- Important implementation decisions: Proposed core relations are `becks_clay.figures` for the clay creation and `becks_clay.assets` for its inspiration photo, gallery poster, display GLB, and optional source model. The README, canonical schema documentation, migrations, identity foreign keys, and ledger location will need a coordinated update when implementation is approved.
+
+# AI Used: ChatGPT
+
+- Canonical database namespace documentation update:
+  - Reason: Make `becks_clay.*` the documented PostgreSQL namespace throughout the project so its tables are identifiable alongside other applications in the shared database.
+  - Investigation: Searched all Markdown, text, and example documentation for the generic `app` PostgreSQL schema, qualified `app.*` relations, migration-ledger references, and similarly named code modules.
+  - Root cause: The starter documentation still described the boilerplate's generic `app` schema even though the product owner selected the application-specific `becks_clay` namespace.
+  - Change made: Updated the root schema-orientation rule and every current documentation reference to application relations, including the migration ledger, identity records, example-domain records, and scheduled-job records. Left `backend/app_schema.py`, Flask `app.py`, and historical journal text unchanged because those are module names or immutable session history rather than PostgreSQL namespace declarations.
+  - Why this approach: It establishes one unambiguous documentation standard without conflating PostgreSQL relation names with existing Python filenames.
+
+- Files touched:
+  - `README.md`
+  - `docs/architecture/domain-ownership.md`
+  - `docs/architecture/decisions/002-database-migration-standard.md`
+  - `docs/scheduled_data_job_standard.md`
+  - `backend/domains/identity/README.md`
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None; documentation only.
+- Tests and verification commands run:
+  - Repository-wide documentation search for `app` schema and `app.*` relation references before and after editing.
+- Results: Current documentation now declares `becks_clay.*` as the canonical application namespace. Remaining `app.py` and `app_schema.py` matches refer to Python modules; older journal references remain as historical context.
+- Current blockers or risks: Runtime schema code and migration SQL still use `app.*`, so the documentation intentionally leads implementation until a coordinated migration change is requested and the live database is inspected.
+- Prevent next time: Use an application-specific PostgreSQL schema in the starter configuration before creating the initial migration.
+- Important implementation decisions: New application relations must use `becks_clay.*`; generic `app.*` and `public.*` application tables are prohibited by the operating manual.
+
+# AI Used: ChatGPT
+
+- Configurable database schema recommendation for the boilerplate:
+  - Reason: Make each application select its PostgreSQL namespace once through configuration instead of replacing hardcoded `app.*` references throughout copied boilerplate.
+  - Investigation: Traced `.env.example`, both Compose files, backend configuration and connection handling, the canonical schema composer, migration apply/check/inspect scripts, initial migration, repositories, tests, and example jobs. Confirmed `APP_SLUG` reaches Compose/Traefik while SQL currently hardcodes `app.*` in every layer.
+  - Root cause: The boilerplate has no database-schema configuration boundary. Its infrastructure identifier and PostgreSQL namespace were designed independently, and migrations plus runtime queries embed a generic literal schema.
+  - Change made: Recommendation only; no runtime files changed. Add a required `DB_SCHEMA` setting such as `becks_clay`, validate it as lowercase snake_case, create it safely with `psycopg2.sql.Identifier`, establish it as the connection `search_path`, and write migrations/repositories/jobs using unqualified table names. Keep `APP_SLUG=becks-clay` separate. A project initializer may suggest `DB_SCHEMA` by converting hyphens to underscores, but runtime should not silently derive or change it.
+  - Why this approach: Explicit configuration avoids unsafe SQL interpolation and prevents an infrastructure rename from silently switching database namespaces. A connection-level `search_path` removes repeated schema literals from ordinary SQL, while centralized identifier quoting handles the few schema-management statements that require identifiers.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Searched Compose, backend, jobs, and scripts for `APP_SLUG`, connection configuration, schema creation, ledger access, and hardcoded `app.*` SQL.
+- Results: Identified all major implementation surfaces that a configurable-schema refactor must cover. Documentation already names `becks_clay.*`, but runtime code remains hardcoded to `app.*`.
+- Current blockers or risks: Before implementing, inspect the live database. If migration `001_initial_schema.sql` has already been applied, do not edit it; add a forward schema-move migration or use a fresh database. PostgreSQL identifiers cannot be safely supplied as ordinary query parameters.
+- Prevent next time: Make `DB_SCHEMA` one of the required copy-time variables alongside `APP_SLUG`, Compose project name, and domains.
+- Important implementation decisions: Prefer explicit `DB_SCHEMA` over runtime derivation from `APP_SLUG`; validate `^[a-z][a-z0-9_]{0,62}$`; set `search_path` centrally for every backend, job, and migration connection; never interpolate an unvalidated environment value into SQL.
+
+# AI Used: ChatGPT
+
+- Implement configurable PostgreSQL namespace across the boilerplate:
+  - Reason: Make copied applications select their database namespace once with `DB_SCHEMA` instead of replacing hardcoded `app.*` references across migrations, repositories, jobs, tests, and tooling.
+  - Investigation: Attempted the mandatory live-schema inspection first. Docker reported that the backend was not running and `CONNECTION_STRING` was unset; the local `.env` was empty, so there was no reachable live schema or applied migration to preserve. Inspected configuration, request connection creation, canonical schema composition, migration apply/check/inspect scripts, migration `001`, domain repositories, job containers, and their tests.
+  - Root cause: The generic schema name was embedded at every SQL call site, while `APP_SLUG` configured only Compose and Traefik. There was no validated database-namespace boundary or connection-level search path.
+  - Change made: Added required `DB_SCHEMA=becks_clay` configuration to `.env.example` and the empty local `.env`; added centralized backend validation and safely quoted `search_path` setup; made migration `001`, repositories, and example-job SQL schema-neutral; taught schema composition and migration tooling to create/use the configured namespace; made schema inspection default to `DB_SCHEMA`; added validation tests and updated the operating manual. Because no database was configured or migration applied, updated the unapplied initial migration directly rather than adding a false forward migration.
+  - Why this approach: Explicit stable configuration separates PostgreSQL identity from mutable infrastructure slugs. Strict lowercase snake_case validation plus `psycopg2.sql.Identifier` prevents unsafe identifier interpolation, while a connection-level search path makes future migrations and domain SQL reusable without schema literals.
+
+- Files touched:
+  - `.env` (local, untracked configuration only)
+  - `.env.example`
+  - `README.md`
+  - `backend/app_schema.py`
+  - `backend/core/config.py`
+  - `backend/core/database.py`
+  - `backend/core/schema.py`
+  - `backend/domains/example_items/repository.py`
+  - `backend/domains/identity/repository.py`
+  - `backend/migrations/001_initial_schema.sql`
+  - `backend/scripts/apply_migrations.py`
+  - `backend/scripts/check_schema_migrations.py`
+  - `backend/scripts/inspect_schema.py`
+  - `backend/tests/conftest.py`
+  - `backend/tests/test_schema_config.py`
+  - `backend/tests/test_schema_snapshot.py`
+  - `jobs/example/example_job.py`
+  - `jobs/example/run_example_job.py`
+  - `jobs/example/test_run_example_job.py`
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None. No connection string or running backend was available; `001_initial_schema.sql` remains unapplied.
+- Tests and verification commands run:
+  - `python3 -m compileall -q backend jobs/example`
+  - `docker compose -f docker-compose.dev.yml run --rm --no-deps -e DB_SCHEMA=becks_clay backend pytest -q`
+  - Dockerized backend tests plus `python app_schema.py --print-sql`, checking generated `CREATE SCHEMA` and `SET LOCAL search_path` statements.
+  - `JOB_COMPOSE_FILE=docker-compose.dev.yml ./scripts/run_job.sh example-job pytest -q`
+  - Dockerized `python scripts/inspect_schema.py --help`.
+  - Repository searches for remaining hardcoded application `app.*` relations; `git diff --check`; Docker one-off container inspection.
+- Results: Python compilation passed. Backend suite passed first at 24 tests and finally at 32 tests after validation coverage. Example-job suite passed first at 5 tests and finally at 10 tests. Generated SQL contains `CREATE SCHEMA IF NOT EXISTS "becks_clay"` and `SET LOCAL search_path TO "becks_clay", public`. Schema inspector starts successfully. No hardcoded application `app.*` SQL remains. No one-off test containers remained after testing.
+- Current blockers or risks: End-to-end migration application against PostgreSQL remains unverified until a real `CONNECTION_STRING` or separate `DEV_CONNECTION_STRING` is configured. The backend was not running, so no restart was needed or performed.
+- Prevent next time: Require `DB_SCHEMA` during initial `.env` setup and retain schema-neutral SQL in all new domains and jobs.
+- Important implementation decisions: `APP_SLUG` may use hyphens and controls infrastructure; `DB_SCHEMA` uses stable lowercase snake_case and controls PostgreSQL. Runtime derivation is intentionally prohibited. Jobs independently validate and set their search path because each scheduled job is a separately buildable Docker service.
+
+# AI Used: ChatGPT
+
+- R2 public-access and custom-domain decision:
+  - Reason: Decide whether the new clay-assets bucket needs a custom domain or public development URL before implementing uploads and model viewing.
+  - Investigation: Reviewed the current bucket settings screenshot and current official Cloudflare R2 documentation for private buckets, public custom domains, presigned URLs, browser CORS, and the `r2.dev` development endpoint.
+  - Root cause: R2 presents custom-domain and public-development controls near the S3 endpoint even though neither is required for private browser access through presigned URLs.
+  - Change made: Recommendation only; no Cloudflare or repository settings changed. Keep the bucket private, leave the public development URL disabled, and do not add a custom domain initially. Configure narrow CORS for the application's development and production origins, then use server-generated presigned PUT/GET URLs against the R2 S3 API endpoint.
+  - Why this approach: It preserves authentication and avoids exposing every object publicly. Cloudflare presigned URLs work only with the S3 API domain, not a custom domain. A custom domain remains useful later if the gallery assets intentionally become public and should use Cloudflare caching.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Reviewed official Cloudflare R2 public-bucket, presigned-URL, and CORS documentation.
+- Results: Confirmed custom domains are for public bucket access/caching and are not required for the selected private signed-URL workflow. Confirmed browser presigned requests still require a bucket CORS policy.
+- Current blockers or risks: Exact CORS production origin should match the final deployed application hostname. Presigned URLs must be short-lived and refreshed before expiration.
+- Prevent next time: Choose public versus authenticated object access before enabling any R2 public-access control.
+- Important implementation decisions: Keep both Custom Domains and Public Development URL disabled for now; add CORS and private R2 API credentials when storage integration is implemented.

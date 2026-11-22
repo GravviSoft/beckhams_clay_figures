@@ -12,6 +12,8 @@ import psycopg2.extensions
 import psycopg2.extras
 from flask import current_app
 
+from core.schema import database_schema, set_search_path
+
 
 class DropTolerantConnection(psycopg2.extensions.connection):
     """A connection whose cleanup cannot mask the original error.
@@ -37,11 +39,15 @@ def get_db():
     connection_string = current_app.config["CONNECTION_STRING"]
     if not connection_string:
         raise RuntimeError("CONNECTION_STRING is required")
-    return psycopg2.connect(
+    schema = database_schema(current_app.config.get("DB_SCHEMA", ""))
+    connection = psycopg2.connect(
         connection_string,
         cursor_factory=psycopg2.extras.RealDictCursor,
         connection_factory=DropTolerantConnection,
     )
+    with connection.cursor() as cursor:
+        set_search_path(cursor, schema)
+    return connection
 
 
 @contextmanager
