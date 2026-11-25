@@ -5,6 +5,19 @@
 // business records, workflow state, and preferences never go in browser storage.
 const TOKEN_KEY = 'auth_token';
 const RETURN_PATH_KEY = 'auth_return_path';
+const SESSION_EVENT = 'app-auth-session-change';
+
+export function subscribeAuthSession(listener) {
+  function onStorage(event) {
+    if (event.key === TOKEN_KEY || event.key === null) listener();
+  }
+  window.addEventListener(SESSION_EVENT, listener);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(SESSION_EVENT, listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
 
 export function getAuthToken() {
   try {
@@ -17,6 +30,7 @@ export function getAuthToken() {
 export function setAuthToken(token) {
   try {
     window.localStorage.setItem(TOKEN_KEY, token);
+    window.dispatchEvent(new Event(SESSION_EVENT));
   } catch {
     // Storage blocked: the session lasts only for this page load.
   }
@@ -25,6 +39,7 @@ export function setAuthToken(token) {
 export function clearAuthSession() {
   try {
     window.localStorage.removeItem(TOKEN_KEY);
+    window.dispatchEvent(new Event(SESSION_EVENT));
   } catch {
     // Nothing to clear.
   }
@@ -34,8 +49,7 @@ export function isAuthenticated() {
   return Boolean(getAuthToken());
 }
 
-export function getAuthHeaders(headers = {}) {
-  const token = getAuthToken();
+export function getAuthHeaders(headers = {}, token = getAuthToken()) {
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

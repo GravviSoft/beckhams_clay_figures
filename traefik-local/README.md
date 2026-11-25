@@ -14,8 +14,12 @@ docker ps --format '{{.Names}}\t{{.Ports}}' | grep -i traefik
   automatically through `proxy-net`.
 - **No Traefik is running:** start this fallback once:
 
+## Quick Start
+
+Run these commands from `traefik-local/`:
+
 ```bash
-docker network inspect proxy-net >/dev/null 2>&1 || docker network create proxy-net
+docker network create proxy-net 2>/dev/null || true
 docker compose up -d
 ```
 

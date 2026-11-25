@@ -33,6 +33,8 @@ LEDGER_TABLE = "schema_migrations"
 MIGRATIONS = [
     "001_initial_schema.sql",
     "002_clay_gallery.sql",
+    "003_gallery_feature.sql",
+    "004_identity_passkeys.sql",
 ]
 
 

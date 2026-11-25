@@ -1,0 +1,8 @@
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS gallery_feature (
+    singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+    figure_id BIGINT NOT NULL REFERENCES figures(id) ON DELETE CASCADE
+);
+
+COMMIT;

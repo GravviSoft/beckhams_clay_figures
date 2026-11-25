@@ -47,3 +47,25 @@ test('401 clears the stored session', async () => {
   await expect(apiJson('/items', { redirectOnUnauthorized: false })).rejects.toThrow('expired');
   expect(window.localStorage.getItem('auth_token')).toBeNull();
 });
+
+test('multipart requests retain the bearer token and let the browser set the boundary', async () => {
+  window.localStorage.setItem('auth_token', 'active');
+  const form = new FormData();
+  form.set('character_name', 'Bowser');
+  global.fetch.mockResolvedValue(response(201, { id: 4 }));
+  await apiJson('/figures', { method: 'POST', body: form });
+  expect(global.fetch).toHaveBeenCalledWith('/api/figures', {
+    method: 'POST', body: form, headers: { Authorization: 'Bearer active' },
+  });
+});
+
+test('a late 401 cannot clear a newer sign-in', async () => {
+  window.localStorage.setItem('auth_token', 'old');
+  let finish;
+  global.fetch.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const pending = apiJson('/figures/authoring', { redirectOnUnauthorized: false });
+  window.localStorage.setItem('auth_token', 'new');
+  finish(response(401, { error: { message: 'expired' } }));
+  await expect(pending).rejects.toThrow('expired');
+  expect(window.localStorage.getItem('auth_token')).toBe('new');
+});

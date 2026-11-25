@@ -1,4 +1,4 @@
-import { clearAuthSession, getAuthHeaders, rememberAuthReturnPath } from './auth';
+import { clearAuthSession, getAuthHeaders, getAuthToken, rememberAuthReturnPath } from './auth';
 
 export const API_BASE = (process.env.REACT_APP_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -50,10 +50,10 @@ function errorMessage(data, status) {
   return readableTextError(data, status);
 }
 
-export async function parseApiResponse(res) {
+export async function parseApiResponse(res, sentToken = getAuthToken()) {
   const data = await readResponseBody(res);
   if (res.status === 401) {
-    clearAuthSession();
+    if (sentToken && sentToken === getAuthToken()) clearAuthSession();
     throw new UnauthorizedError(errorMessage(data, 401), data);
   }
   if (!res.ok) {
@@ -62,8 +62,10 @@ export async function parseApiResponse(res) {
   return data;
 }
 
-export function apiFetch(path, options = {}) {
-  return fetch(apiUrl(path), { ...options, headers: getAuthHeaders(options.headers || {}) });
+export function apiFetch(path, options = {}, token = getAuthToken()) {
+  const headers = getAuthHeaders(options.headers || {}, token);
+  if (options.body instanceof FormData) delete headers['Content-Type'];
+  return fetch(apiUrl(path), { ...options, headers });
 }
 
 const RETRYABLE_READ_STATUSES = new Set([500, 502, 503, 504]);
@@ -71,17 +73,17 @@ export const READ_RETRY_DELAY_MS = 400;
 
 // Reads are safe to repeat, so one retry absorbs a momentary server or
 // database-connection drop. Writes are never retried automatically.
-async function fetchWithReadRetry(path, options) {
+async function fetchWithReadRetry(path, options, token) {
   const method = String(options.method || 'GET').toUpperCase();
   const retryable = method === 'GET' || method === 'HEAD';
   try {
-    const res = await apiFetch(path, options);
+    const res = await apiFetch(path, options, token);
     if (!retryable || !RETRYABLE_READ_STATUSES.has(res.status)) return res;
   } catch (networkError) {
     if (!retryable) throw networkError;
   }
   await new Promise((resolve) => setTimeout(resolve, READ_RETRY_DELAY_MS));
-  return apiFetch(path, options);
+  return apiFetch(path, options, token);
 }
 
 export function isUnauthorizedError(error) {
@@ -89,11 +91,12 @@ export function isUnauthorizedError(error) {
 }
 
 export async function apiJson(path, options = {}) {
-  const res = await fetchWithReadRetry(path, options);
+  const sentToken = getAuthToken();
+  const res = await fetchWithReadRetry(path, options, sentToken);
   try {
-    return await parseApiResponse(res);
+    return await parseApiResponse(res, sentToken);
   } catch (error) {
-    if (isUnauthorizedError(error) && options.redirectOnUnauthorized !== false
+    if (isUnauthorizedError(error) && !getAuthToken() && options.redirectOnUnauthorized !== false
         && typeof window !== 'undefined' && window.location.pathname !== '/login') {
       rememberAuthReturnPath();
       window.location.assign('/login');

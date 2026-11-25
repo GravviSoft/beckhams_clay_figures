@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from 'primereact/button';
 import { Dialog } from 'primereact/dialog';
 import './AuthenticatedUi.css';
+import './CharcoalForm.css';
 
 const joinClasses = (...values) => values.filter(Boolean).join(' ');
 
@@ -24,10 +25,13 @@ export function AppField({ label, optional = false, htmlFor, children, className
   </div>;
 }
 
-export function AppFormDialog({ title, titleMeta, className, children, ...props }) {
+export function AppFormDialog({ title, titleMeta, className, appearance, children, ...props }) {
   const header = <span className="app-form-dialog__title">
     <span>{title}</span>
     {titleMeta && <span>{titleMeta}</span>}
   </span>;
-  return <Dialog {...props} header={header} className={joinClasses('app-form-dialog', className)}>{children}</Dialog>;
+  return <Dialog {...props} header={header}
+    className={joinClasses('app-form-dialog', appearance === 'charcoal' && 'app-form-dialog--charcoal', className)}>
+    {children}
+  </Dialog>;
 }

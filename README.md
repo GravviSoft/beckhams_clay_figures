@@ -1,3 +1,19 @@
+
+
+
+# AI Command That I Always Start With
+
+Before doing anything else, read README.md end-to-end.
+Pay close attention to the project rule about not using npm outside Docker.
+Your task:
+1. Read the last few days of journal entries.
+2. Review the schema file at backend/app_schema.py
+3. Make sure you journal as we work.
+After reviewing those items, report back before making any changes.
+
+
+
+
 # Beck's Clay Figures
 
 A barebones full-stack starter: React 18 + PrimeReact frontend, Flask API,
@@ -27,23 +43,13 @@ files. Do not assume standard project conventions apply here. State what you
 verified, what remains uncertain, and do not make changes based on an
 unverified assumption.
 
-### Mandatory Live-Editing and Hot-Reload Safety Rule
+### Development Reloads
 
-The operator may be using the running development application while
-AI-assisted development is in progress. Frontend source edits trigger hot
-module reload and can destroy unsaved state held only in the browser (open
-editors, unsaved forms). Before changing any watched frontend source file, warn
-that a reload is about to occur and wait for explicit confirmation that every
-live editor has been saved and closed. A request to implement a frontend change
-is not by itself that confirmation.
-
-Read-only investigation, backend-only work, README/journal updates, and tests
-using mocked APIs may proceed while the operator is working only when they do
-not reload or mutate the live frontend. Before any command or file change that
-could rebuild, restart, recreate, or reload a running service, state the impact
-and wait for confirmation. After frontend changes, say when it is safe to
+Frontend edits can hot-reload the dev app and clear temporary browser state.
+Routine frontend edits and app-local dev reloads can proceed without separate
+live-browser confirmation. After frontend changes, say when it is safe to
 refresh. After backend edits, restart the backend and verify the change imports
-before the operator tests it; the Flask reloader can miss changes.
+before the operator tests it because the Flask reloader can miss changes.
 
 ### Mandatory Domain-Organization Rule
 
@@ -279,7 +285,7 @@ For production, back up first and review every pending file
 | POST | `/api/auth/register` | — | Create account (`409` if the email exists) |
 | POST | `/api/auth/login` | — | Bearer token for valid credentials |
 | GET | `/api/auth/me` | Bearer | Current user |
-| GET | `/api/figures` | Bearer | List the caller's clay figures and asset metadata |
+| GET | `/api/figures` | — | Publicly list clay figures and asset metadata |
 | GET/POST | `/api/items` | Bearer | List / create the caller's example items |
 | PATCH/DELETE | `/api/items/<id>` | Bearer | Update / delete the caller's item (`404` otherwise) |
 
@@ -301,6 +307,30 @@ Every error response is `{"error": {"code": "...", "message": "..."}}`.
   network modules explicitly.
 
 ## Frontend Loading-State Standard
+
+The development gallery at `/?preview=local` has a **Preview a local GLB** picker in the
+Collection panel. Each local GLB gets a model thumbnail and a **⋯ → Delete**
+action. The collection lives in the browser until you leave or reload the
+gallery. It uses a version-pinned Model Viewer module from jsDelivr.
+The public gallery is available signed out. Sign in opens a dialog over the
+gallery. To set up device sign-in, use **Add a passkey** after password sign-in,
+then select **Sign in with a passkey** on later visits. Passkeys are tied to the
+site hostname. Use the public HTTPS address for phones and enroll on the hostname
+where you plan to sign in. Keep the exact origins in `CORS_ORIGINS`.
+For signed-in visitors, the upload icon opens the GLB picker, shows
+the model immediately, and attempts to save it with a name based on the
+filename. If a session expires during upload, the sign-in dialog opens and
+resumes the selected file after sign-in. Every signed-in account can save a GLB to R2 and its metadata to
+PostgreSQL. Accounts can edit their own figures and attach an optional gallery
+photo. The configured gallery owner can star a model they uploaded to pin it
+first and make it the gallery's default view.
+The stage has zoom and reset buttons on desktop and mobile, and a desktop
+orientation widget to snap to the front, right, or top view.
+Set `CLAY_GALLERY_OWNER_USER_ID` only if you want to enable the gallery-wide
+featured model action. Set the R2 credentials and bucket from `.env.example`. Use a separate dev
+database and bucket when publishing test figures.
+The GLB upload limit defaults to 250 MB. Set `CLAY_GALLERY_MODEL_MAX_MB` in
+`.env` to adjust it, then recreate the backend container so it reads the change.
 
 - Use `components/PageLoader.jsx` for every loading state instead of plain
   text or a new spinner.
@@ -333,6 +363,10 @@ Authenticated forms, dialogs, and confirmations reuse
 `frontend/src/components/authenticated-ui/` (`AppButton`, `AppActionGroup`,
 `AppActionBar`, `AppField`, `AppFormDialog`) instead of inventing a page-owned
 treatment. Unauthenticated entry screens may keep their own design.
+
+Gallery dialogs use the shared charcoal appearance for grouped fields,
+indigo primary actions, and mobile-friendly inputs. Sign-in, registration,
+and figure editing use this same appearance.
 
 - `AppButton` variants carry meaning: `primary` main action, `secondary`
   alternate workflow, `accent` highlighted transition, `outline` restrained
@@ -420,7 +454,7 @@ Full tree and responsibilities: [`docs/architecture/project-structure.md`](docs/
 | `CORS_ORIGINS` | Comma-separated allowed browser origins |
 | `FLASK_ENV`, `FLASK_DEBUG` | Development behavior |
 | `APP_SECRET_KEY` | Token signing secret (identical everywhere it is used) |
-| `AUTH_TOKEN_TTL_SECONDS` | Token lifetime |
+| `AUTH_TOKEN_TTL_SECONDS` | Sign-in token lifetime, 24 hours by default |
 | `CONNECTION_STRING` | PostgreSQL connection URI |
 | `DEV_CONNECTION_STRING` | Optional separate dev database |
 | `AUTOMATION_FAILURE_DISCORD_WEBHOOK_URL` | Optional private failure webhook |

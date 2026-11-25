@@ -1,0 +1,443 @@
+# AI Used: ChatGPT
+
+- Interactive 3D gallery strategy review:
+  - Reason: Critique the proposed React-based 3D gallery strategy and produce an implementation plan grounded in the repository's current schema, domain boundaries, and in-progress public gallery work.
+  - Investigation: Read the root `README.md` end-to-end before all other project work; read the journal standard and the complete available recent journal history; reviewed the canonical `backend/app_schema.py`, both registered migrations, the clay-gallery backend domain, identity and authorization model, API client, frontend routing/layout, current gallery shell, upload placeholder, package manifest, active diff, and the supplied strategy text and reference screenshot. Confirmed `backend/rentals_app_schema.py` does not exist in this repository and that `backend/app_schema.py` is the canonical schema composer.
+  - Root cause: The proposed strategy correctly identifies GLB and a React 3D renderer, but it starts at the viewer layer while this application's critical unfinished boundary is secure R2 asset upload/delivery and uploader authorization. The current schema stores private object keys rather than browser-ready URLs, the public gallery response exposes those keys, registration remains available at the backend, and there is no create/presign/finalize workflow yet.
+  - Change made: Added this planning journal entry only. No application source, migration, database, dependency, container, or service change was made.
+  - Why this approach: Evidence-first planning avoids coupling the viewer to temporary URLs, insecure raw storage keys, or an authorization model that would let any registered account upload. It also preserves the current uncommitted frontend/backend work and respects the mandatory frontend hot-reload confirmation rule.
+
+- Files touched:
+  - `work_journal/2026-11-24.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Read `README.md` lines 1-473 in full.
+  - Read `work_journal/README.md` and `work_journal/2026-11-21.txt`.
+  - Read `backend/app_schema.py`, migrations `001_initial_schema.sql` and `002_clay_gallery.sql`, clay-gallery and identity domain code, frontend gallery/upload/layout/API code, and `frontend/package.json`.
+  - Inspected `git status --short`, the active diff summary, and the supplied strategy attachment.
+- Results: Confirmed Docker-only npm policy; no npm command was run. Confirmed the current schema has canonical `figures` and normalized `assets` records with one asset per type per figure. Confirmed the public gallery shell and protected upload entry are present but unverified, while real asset delivery, upload persistence, and uploader-specific authorization are absent.
+- Current blockers or risks: Watched frontend source cannot be edited until the operator confirms all live browser editors/forms are saved and closed. Dockerized runtime tests may also require starting or restarting stopped services, which needs advance confirmation. The project must decide private signed delivery versus intentional public delivery before browser model URLs are designed.
+- Prevent next time: Design the asset lifecycle and authorization contract before wiring a renderer directly to storage metadata.
+- Important implementation decisions: Recommend GLB as the web display format and keep source/high-detail models separate. Build a focused viewer spike after the backend can return safe asset URLs, then integrate it into a desktop split layout with a large center stage and a right-side upload/gallery rail, with responsive mobile fallback and progressive loading.
+
+# AI Used: ChatGPT
+
+- First interactive gallery pass:
+  - Reason: Use a real Tripo export to evaluate the gallery presentation before building persistent upload.
+  - Investigation: Reviewed gallery, routing, auth return behavior, and versioned Model Viewer documentation. No tracked GLB was found in the repository search.
+  - Root cause: The public gallery was a placeholder card grid with no browser model preview.
+  - Change made: After operator hot-reload confirmation, added a responsive stage and collection rail, development-only browser GLB preview, and sign-in return to the gallery with a signed-in upload link.
+  - Why this approach: Local object URLs support real model review immediately. The version-pinned development viewer supplies orbit and zoom with one component.
+- Files touched: Root README, this journal, AppLayout JSX and CSS, ClayGalleryPage JSX and CSS, and App.test.jsx.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`, attempted Dockerized App.test.jsx, inspected project containers, and probed the gallery and health routes.
+- Results: Docker test could not start because the frontend was stopped. Only the regular exited project containers were listed. Both route probes could not connect. Browser rendering and real GLB interaction remain unverified.
+- Current blockers or risks: Dev stack startup requires operator confirmation under the hot-reload rule. The local preview loader depends on CDN access and WebGL.
+- Prevent next time: Verify the dev stack and shared Traefik before scheduling interactive QA.
+- Important implementation decisions: Public gallery, session-based UI link to existing protected workspace, local preview scoped to development, and no persistent upload API in this milestone.
+
+# AI Used: ChatGPT
+
+- Gallery verification after dev startup:
+  - Reason: Verify the first gallery pass through the running dev stack.
+  - Investigation: Checked Compose startup, frontend compilation, the configured hostname, routed responses, and the Dockerized gallery test.
+  - Root cause: The app test's mock returned undefined because Jest resets mock implementations before tests. The frontend route timed out during startup and responded once compilation finished.
+  - Change made: Replaced the resettable test mock with a plain async function in `frontend/src/App.test.jsx`.
+  - Why this approach: Keeps the simulated API response deterministic under the repository's test configuration.
+- Files touched: `frontend/src/App.test.jsx` and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized `src/App.test.jsx`, Compose status and frontend logs, and HTTP probes against `becksclay.localhost`.
+- Results: Test passed. Webpack compiled successfully. Gallery, health, and figures routes returned HTTP 200. Only regular project containers were observed.
+- Current blockers or risks: Browser automation was unavailable, so opening and rotating a real GLB remains unverified.
+- Prevent next time: Use plain async stubs for API mocks that need a fixed result.
+- Important implementation decisions: Keep the configured dev hostname for runtime checks and use npm only inside Docker.
+
+# AI Used: ChatGPT
+
+- Local gallery card and removal investigation:
+  - Reason: Show each selected GLB in the right rail with a thumbnail and a way to remove it.
+  - Investigation: Compared the screenshots with the gallery source and ran `git diff --check`.
+  - Root cause: The development picker keeps only the latest file in one preview slot. The rail renders only figures returned by the API.
+  - Change made: Recorded the finding and requested hot-reload confirmation.
+  - Why this approach: The currently open preview lives in memory and a source reload clears it.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed before the journal update.
+- Current blockers or risks: Frontend source edits await confirmation under the root README.
+- Important implementation decisions: Local model cards should select the stage model and remove the local entry through a card menu.
+
+# AI Used: ChatGPT
+
+- Local GLB collection implemented:
+  - Reason: Make selected models visible and removable from the right rail.
+  - Investigation: Verified Model Viewer screenshot support and the local Git root and origin.
+  - Root cause: The single preview slot had no collection card or removal action.
+  - Change made: Added session-only cards with rendered thumbnails, stage selection, and Delete actions.
+  - Why this approach: One live viewer supplies the thumbnails and keeps local file management in the gallery.
+- Files touched: Gallery JSX and CSS, root README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized `App.test.jsx`, frontend logs, project container and Traefik status, local route probes, and `git diff --check`.
+- Results: Gallery route test passed and webpack compiled. Both app containers were running, with no one-off project containers. HTTP probes could not connect because shared Traefik was stopped.
+- Current blockers or risks: Browser checks for thumbnail capture and removal remain pending.
+- Important implementation decisions: Delete removes the temporary gallery entry. The Git remote already uses `beckhams_clay_figures.git`; the old name comes from the local checkout directory.
+
+# AI Used: ChatGPT
+
+- Charcoal gallery palette and development reload policy:
+  - Reason: Match the reference's charcoal backdrop and remove the separate live-browser confirmation requirement at the owner's direction.
+  - Investigation: Compared the reference with the stage, rail, card, and navigation colors and reviewed the README reload rule.
+  - Root cause: The gallery used warm brown surfaces and the README imposed a separate confirmation for live edits.
+  - Change made: Replaced the warm surfaces with neutral grays and updated the README to allow routine frontend edits and app-local dev reloads.
+  - Why this approach: A soft gray center keeps the model prominent while darker panels frame it.
+- Files touched: Gallery and navigation CSS, root README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed. Browser appearance was not visually verified.
+- Current blockers or risks: None for the CSS change.
+- Important implementation decisions: Confirmation is no longer required for routine live-browser reloads in this project.
+
+# AI Used: ChatGPT
+
+- Larger thumbnail and local figure details:
+  - Reason: Make the model easier to see in its card and allow correction of figure details.
+  - Investigation: Reviewed thumbnail sizing, local preview state, and shared dialog controls.
+  - Root cause: The card scaled down the full stage capture and displayed an immutable filename.
+  - Change made: Enlarged the thumbnail within its frame and added an Edit dialog for name, date made, and description.
+  - Why this approach: The stage and card share local figure metadata and can update immediately on Save.
+- Files touched: Gallery JSX and CSS and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check` and Dockerized `src/App.test.jsx`.
+- Results: Gallery route test passed. Thumbnail sizing and the edit dialog were not verified in a browser.
+- Current blockers or risks: Edits expire with the development preview session.
+- Important implementation decisions: Use the existing shared form dialog and keep metadata with the session-only preview.
+
+# AI Used: ChatGPT
+
+- Password-first saved gallery and mobile sign-in:
+  - Reason: Save a figure, GLB, and photo across reloads with sign-in on the gallery page.
+  - Investigation: Inspected the live schema, existing identity flows, gallery and upload workspace, and the R2 client configuration without displaying secrets.
+  - Root cause: The development file picker kept previews in memory and the protected workspace had no persistence endpoint.
+  - Change made: Added an on-page password modal, owner-only multipart upload, PostgreSQL metadata creation, private R2 writes and display reads, saved gallery cards, and a mobile-friendly upload form.
+  - Why this approach: The current schema supports a figure and both assets without a migration. The server checks the canonical uploader ID before touching files.
+- Files touched: Clay gallery backend and tests, backend requirements, auth and gallery frontend, upload workspace, environment template, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Live schema inspection, Docker backend build, 35 backend tests, 6 frontend tests, read-only R2 HeadBucket, backend restart/import check, and local HTTP and container checks.
+- Results: Tests passed and the gallery, health, and figures routes returned HTTP 200. Upload tests used fake storage. Both regular app containers were running with no temporary containers.
+- Current blockers or risks: Owner ID and separate dev DB are unset. R2 HeadBucket returned 403. A real upload and visual mobile check remain unverified.
+- Important implementation decisions: Keep public reads and owner-only writes. Saved edit/delete and passkeys remain follow-up work after a successful password-based live upload.
+
+# AI Used: ChatGPT
+
+- Registration in the gallery modal:
+  - Reason: Let the owner create an account from the gallery.
+  - Investigation: Reviewed the existing registration API client, shared auth form, and sign-in modal.
+  - Root cause: The app had registration plumbing with no entry point on the gallery.
+  - Change made: Added Create an account and Back to sign in modes inside the existing modal.
+  - Why this approach: The same form and API client handle registration without navigating away from the gallery.
+- Files touched: App layout, shared auth form, app test, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized `src/App.test.jsx`, HTTP gallery and health probes, and `git diff --check`.
+- Results: Test passed, both routes returned HTTP 200, and only regular app containers were present.
+- Current blockers or risks: New accounts still require explicit owner configuration for upload access.
+- Important implementation decisions: Keep registration in the gallery modal and reuse the existing backend endpoint.
+
+# AI Used: ChatGPT
+
+- Compact sign-in and registration modal:
+  - Reason: Remove unused space beside the credentials form.
+  - Investigation: Compared the shared dialog width with the embedded form width.
+  - Root cause: The shared dialog was wider than the credentials form.
+  - Change made: Sized the auth dialog to its form and let the form fill the available width.
+  - Why this approach: Both auth modes fit narrow screens and other dialogs keep their existing sizing.
+- Files touched: App layout JSX and CSS, auth form CSS, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed. Browser appearance was not verified.
+- Current blockers or risks: None.
+- Important implementation decisions: Scope the compact width to the auth modal.
+
+# AI Used: ChatGPT
+
+- Collection upload icon and save diagnosis:
+  - Reason: Simplify the rail and prevent the temporary preview picker from being mistaken for saved upload.
+  - Investigation: Verified the running backend has no configured uploader and that the configured R2 bucket still returns HTTP 403 to HeadBucket.
+  - Root cause: Sign-in alone cannot enable saved upload. The development preview picker did not persist files.
+  - Change made: Removed the empty message, placed the icon-only owner upload action next to Collection, and moved the local preview picker behind the development query option.
+  - Why this approach: The default collection now presents only the persistent upload action when the operator has permission.
+- Files touched: Gallery JSX and CSS, app test, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized app test, route probes, container inspection, and `git diff --check`.
+- Results: Test passed, both routes returned HTTP 200, and only regular app containers were present.
+- Current blockers or risks: Owner account selection and R2 permissions still block a live save.
+- Important implementation decisions: Keep the temporary workbench available at `/?preview=local` in development.
+
+# AI Used: ChatGPT
+
+- Signed-in upload icon and featured figure:
+  - Reason: Show Upload for every signed-in account and let the owner pin one model.
+  - Investigation: Inspected the live schema and traced the icon visibility and gallery ordering.
+  - Root cause: The icon depended on uploader permission and gallery ordering had no featured state.
+  - Change made: Switched icon visibility to sign-in state and added card stars backed by a singleton saved selection.
+  - Why this approach: UI visibility follows the requested sign-in rule and the server still controls writes. A singleton row enforces one featured model under concurrent updates.
+- Files touched: Gallery backend, migration and schema composer, gallery and upload UI, app shell, tests, README, and this journal.
+- Database changes or migrations applied: Applied `003_gallery_feature.sql` and verified the ledger.
+- Tests and verification commands run: Dockerized backend and app tests, migration verification, app import, route probes, container inspection, and `git diff --check`.
+- Results: 36 backend tests and two frontend tests passed. Gallery, health, and figures returned HTTP 200. No temporary containers were present.
+- Current blockers or risks: No live owner action was tested. Saved upload still depends on configured authorization and working R2 access.
+- Important implementation decisions: The saved star updates the default stage and first gallery position; a local preview's star is scoped to development session state.
+
+# AI Used: ChatGPT
+
+- In-place upload dialog:
+  - Reason: Keep the gallery open during upload and match its charcoal styling.
+  - Investigation: Traced the upload icon, standalone route, workspace form, and shared PrimeReact components.
+  - Root cause: The icon linked to a separate page and the form used browser-default fields.
+  - Change made: Replaced the upload route with a responsive gallery dialog. A successful save closes the dialog, reloads the collection in place, and selects the new model.
+  - Why this approach: Keeps the stage mounted and reuses shared PrimeReact form and dialog controls.
+- Files touched: Gallery, app router and test, upload workspace, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized `App.test.jsx`, local gallery and health probes, container inspection, and `git diff --check`.
+- Results: Both UI tests passed and both routes returned HTTP 200. No one-off containers were present.
+- Current blockers or risks: Live saving still depends on owner and R2 configuration. Styling was not visually checked in a browser.
+- Important implementation decisions: Save errors keep the dialog and selections open, and successful saves update the gallery without navigation.
+
+# AI Used: ChatGPT
+
+- Instant model preview from Upload:
+  - Reason: Show the picked model immediately and let the user enter details later from the card.
+  - Investigation: Reviewed the GLB picker, temporary preview state, card actions, and upload dialog.
+  - Root cause: Upload opened the persistence form before the chosen model could be viewed.
+  - Change made: The upload icon now opens the GLB picker. Edit updates the local figure, and Save to gallery reuses the chosen GLB and entered details.
+  - Why this approach: The preview and authoring flows share one selected file, with persistent saving available from the card.
+- Files touched: Gallery, upload workspace, frontend tests, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized app tests, route probes, container inspection, and `git diff --check`.
+- Results: Two tests passed and both routes returned HTTP 200. No one-off containers remained. Real WebGL rendering and saved upload were not exercised.
+- Current blockers or risks: Persistent saves still require an authorized account and working R2 credentials.
+- Important implementation decisions: Preview opens with a name derived from the filename and remains temporary until Save to gallery succeeds.
+
+# AI Used: ChatGPT
+
+- Featured star and thumbnail sizing:
+  - Reason: Move the star out of the image's lower area and make the model more prominent.
+  - Investigation: Compared the screenshot with the card's positioning and thumbnail scale rules.
+  - Root cause: The star sat near the footer and the stage capture retained wide margins.
+  - Change made: Moved the star to the top-right and increased local render thumbnail scale within the clipped image area.
+  - Why this approach: Keeps the name, menu, and saved photo sizing intact.
+- Files touched: Gallery CSS and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed. Browser appearance was not verified.
+- Current blockers or risks: None for this styling change.
+- Important implementation decisions: Scope increased zoom to rendered previews.
+
+# AI Used: ChatGPT
+
+- Optional gallery photo:
+  - Reason: Let the user save a GLB without attaching a photo.
+  - Investigation: Traced the browser required field and backend multipart validation.
+  - Root cause: Both layers required a gallery photo.
+  - Change made: Marked the picker optional and allowed the backend to save a display model alone.
+  - Why this approach: The normalized asset table already supports figures without a poster.
+- Files touched: Upload workspace, clay gallery service and tests, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized gallery route tests, backend restart and import, HTTP probes, container inspection, and `git diff --check`.
+- Results: Five tests passed, including saves with and without photos using mocked storage. Both local routes returned HTTP 200. No temporary containers were present.
+- Current blockers or risks: No live R2 upload was performed.
+- Important implementation decisions: Existing cards use the gallery placeholder when no poster was provided.
+
+# AI Used: ChatGPT
+
+- Shared edit and gallery save form:
+  - Reason: Reuse the styled figure form when opening Edit.
+  - Investigation: Traced the two dialogs and compared their fields and submission behavior.
+  - Root cause: Preview editing and gallery save had duplicate forms.
+  - Change made: Both actions now use the charcoal PrimeReact dialog reached from Edit.
+  - Why this approach: The fields and optional photo are defined once and the submit action controls whether to save locally or publish.
+- Files touched: Gallery UI, upload workspace, frontend test, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized app test, route probes, container inspection, and `git diff --check`.
+- Results: Two tests passed and both routes returned HTTP 200. No temporary containers were present.
+- Current blockers or risks: Live storage was not exercised.
+- Important implementation decisions: Save edits keeps the model local and Save to gallery publishes it when authorized.
+
+# AI Used: ChatGPT
+
+- Gallery camera controls:
+  - Reason: Make close inspection easy on desktop and mobile and provide a desktop axis guide.
+  - Investigation: Reviewed the existing viewer and the camera contract in the pinned Model Viewer release.
+  - Root cause: Zoom depended on gestures and there was no reset or axis selector.
+  - Change made: Added zoom buttons, initial-view reset, and an axis widget that tracks orbit and snaps to front, right, or top.
+  - Why this approach: Both local and saved figures reuse the same camera component and Model Viewer methods.
+- Files touched: Gallery JSX and CSS, ViewerControls.jsx, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`, attempted the existing Dockerized gallery test, and probed the local routes.
+- Results: Whitespace check passed. The Docker command stalled and the local gallery route refused the connection.
+- Current blockers or risks: Browser interaction and Docker test results remain unverified.
+- Important implementation decisions: Keep the axis widget on desktop and 44px zoom targets on both layouts.
+
+# AI Used: ChatGPT
+
+- Right-side camera controls and axis refinement:
+  - Reason: Keep controls clear of the model and more closely match the supplied axis reference.
+  - Investigation: Compared existing overlay positioning and axis sizing with both screenshots.
+  - Root cause: The toolbar overlaid a full-width render surface and the axis labels dominated the stems.
+  - Change made: Reserved a separate right gutter on desktop and mobile, stacked the toolbar vertically, and reduced the axis heads while thickening stems and adding faint opposite-axis dots.
+  - Why this approach: The viewer canvas ends before the control gutter, so the controls cannot cover rendered geometry.
+- Files touched: Gallery JSX and CSS, ViewerControls.jsx, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check` and local gallery route probe.
+- Results: Whitespace check passed. The local gallery route refused the connection, preventing visual checks.
+- Current blockers or risks: Desktop and mobile appearance has not been visually verified.
+- Important implementation decisions: Maintain mobile touch-target sizing and keep orientation desktop-only.
+
+# AI Used: ChatGPT
+
+- Automatic signed-in GLB save:
+  - Reason: Persist a model as soon as it is picked and preserve the ability to edit after upload.
+  - Investigation: Traced the preview-only picker and checked the running owner and R2 configuration and live schema.
+  - Root cause: The picker never called the save API. The runtime owner ID is also unset and R2 HeadBucket returned 403.
+  - Change made: Immediately submit the GLB using its filename as the default name; keep the unsaved preview and show errors on failure; add owner-scoped saved edits with an optional photo.
+  - Why this approach: The user sees the model immediately and the confirmed save goes through the existing storage boundary without a form or navigation.
+- Files touched: Clay gallery backend and tests, gallery and upload UI, app test, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized backend and app tests, backend restart and import, read-only R2 probe, route and container checks, and `git diff --check`.
+- Results: 38 backend and three frontend tests passed. Gallery, health and figures routes returned HTTP 200. Only regular containers were present.
+- Current blockers or risks: Live saving is blocked until the registered owner's ID and working R2 credentials are configured. No live object was written.
+- Important implementation decisions: Preserve owner-only writes; report unsaved state rather than treating a preview as persisted.
+
+# AI Used: ChatGPT
+
+- Full gallery QA pass:
+  - Reason: Check the gallery changes as a whole and separate tested behavior from live blockers.
+  - Investigation: Reviewed same-page auth, upload and edit flows, featured ordering, camera controls, and card rendering. Ran full frontend and backend suites and a production frontend compilation. Probed public routes, anonymous authoring, live figure count, migration ledger, and R2 access.
+  - Root cause: Live saves remain blocked by the unset uploader ID and the R2 bucket returning 403. Saved cards only render a supplied poster, and Delete is implemented only for local previews.
+  - Change made: QA journal entry only.
+  - Why this approach: The live dev stack uses the configured shared database and has no separate dev database. Read-only checks avoid adding test figures or accounts to it.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized full frontend and backend tests, CI frontend build, migration ledger check, public gallery and API probes, container inspection, R2 HeadBucket, browser access attempt, and `git diff --check`.
+- Results: 38 backend and 12 frontend tests passed. Production frontend compiled successfully. Three migrations match the live ledger. Gallery, health, and figures returned 200; anonymous authoring returned 401. There are zero saved figures. No temporary containers were present.
+- Current blockers or risks: Browser access host unavailable. Actual desktop/mobile interaction, live upload and reload, and persisted feature changes remain unverified. Public registration is still enabled by design for onboarding.
+- Important implementation decisions: Report QA findings separately from fixes and configure owner/R2 before live acceptance testing.
+
+# AI Used: ChatGPT
+
+- Shared charcoal dialog style:
+  - Reason: Bring sign-in and registration in line with the figure form.
+  - Investigation: Compared the figure form styles with the separate light auth modal.
+  - Root cause: The charcoal palette and grouped fields were scoped to the figure form.
+  - Change made: Added a shared charcoal dialog appearance and applied it to figure editing, sign-in, and registration.
+  - Why this approach: Reuse visual choices while letting the shorter auth dialog keep a compact width.
+- Files touched: Shared authenticated UI, app shell, identity form, figure form, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Full Docker frontend suite, gallery and API health probes, container inspection, and `git diff --check`.
+- Results: All 12 frontend tests passed and both routes returned HTTP 200. No temporary containers remained.
+- Current blockers or risks: Browser appearance was not visually verified.
+- Important implementation decisions: Treat the charcoal appearance as shared and keep compact auth sizing responsive.
+
+# AI Used: ChatGPT
+
+- Upload and edit for signed-in accounts:
+  - Reason: Remove the uploader allowlist that blocked signed-in accounts from saving.
+  - Investigation: Traced the 403 to duplicate allowlist checks in routes and service and reviewed the card error layout.
+  - Root cause: Authentication succeeded, but the write endpoints still required the configured gallery-owner ID.
+  - Change made: Any authenticated account can create a figure and edit its own figures. Authoring reports editable IDs. Card controls are positioned against the thumbnail area, above save errors.
+  - Why this approach: Sign-in grants upload while per-figure ownership protects other accounts' entries. Gallery-wide feature permission remains separate.
+- Files touched: Gallery routes, service, repository, tests, UI, environment template, READMEs, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Backend restart/import, full Docker frontend and backend tests, live HTTP probes, container inspection, and `git diff --check`.
+- Results: 39 backend and 12 frontend tests passed. Gallery, health, and figures returned HTTP 200. No temporary containers were present.
+- Current blockers or risks: Live saving has not been reverified with working storage. The latest R2 access check returned 403.
+- Important implementation decisions: Keep figures public, use ownership for edits, and retain the configured global feature permission.
+
+# AI Used: ChatGPT
+
+- Larger GLB uploads and live R2 probe:
+  - Reason: Remove the old 50 MB GLB barrier and determine whether current R2 credentials can write.
+  - Investigation: Traced both size checks, inspected R2 setting presence without printing values, and tested the live bucket.
+  - Root cause: The app enforced a fixed 50 MB limit and buffered uploads. Separately, the configured R2 credentials returned 403 for both HeadBucket and PutObject.
+  - Change made: Use a configurable 250 MB default limit and stream uploads from the multipart file. Removed the browser's hard-coded GLB size check.
+  - Why this approach: Larger GLBs can reach storage without allocating their full size in application memory.
+- Files touched: Clay gallery service, routes, tests, upload form, environment template, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: R2 HeadBucket and tiny PutObject attempt, Docker backend restart and import, backend and gallery tests, route probes, container inspection, and `git diff --check`.
+- Results: 40 backend tests and three frontend tests passed, including a 51 MB GLB validation case. Both routes returned HTTP 200. R2 rejected the write with 403 AccessDenied. No probe object was created.
+- Current blockers or risks: Live upload remains blocked until the configured R2 credentials can write to the bucket.
+- Important implementation decisions: Use `CLAY_GALLERY_MODEL_MAX_MB` for the GLB limit and keep the 5 MB photo limit.
+
+# AI Used: ChatGPT
+
+- R2 credential and scope diagnosis:
+  - Reason: Determine whether bucket failure comes from stale running settings or Cloudflare authorization.
+  - Investigation: Compared effective Compose settings to the running container without displaying values and tested R2 read operations.
+  - Root cause: Cloudflare denies access with the credentials currently loaded. The exact token, account, or bucket scope mismatch cannot be determined from the response.
+  - Change made: Journal entry only.
+  - Why this approach: Read-only probes distinguish local configuration propagation from R2 authorization without writing objects.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Compose configuration comparison, R2 HeadBucket, ListObjectsV2, ListBuckets, and jurisdiction-specific ListObjectsV2 checks.
+- Results: The five R2 values were present and matched between Compose and the running container. Default and jurisdiction endpoints returned 403. No credential values or object names were displayed.
+- Current blockers or risks: Verify the exact bucket and its scope in Cloudflare, then refresh the container after changing credentials.
+- Important implementation decisions: Keep diagnostics read-only and leave environment values untouched.
+
+# AI Used: ChatGPT
+
+- R2 verification after credential update:
+  - Reason: Verify the new bucket credentials from the running app.
+  - Investigation: Recreated only the development backend to load the updated environment and used the app's R2 client.
+  - Root cause: The previous credentials were denied for the new bucket. The replacement credentials have working object permissions.
+  - Change made: Recreated the backend and removed the temporary probe object after reading it back.
+  - Why this approach: Verify the exact runtime configuration without writing gallery data or displaying credentials.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Backend recreation, R2 PutObject, GetObject, and DeleteObject, and gallery and API route probes.
+- Results: R2 write, read-back, and deletion succeeded. Gallery and API routes answered.
+- Current blockers or risks: Actual GLB upload and reload remain to be tested through the UI.
+- Important implementation decisions: Use only a small uniquely named probe object for storage verification.
+
+# AI Used: ChatGPT
+
+- Expired-session upload recovery:
+  - Reason: Replace the raw bearer-token failure with an in-place sign-in and resume flow.
+  - Investigation: Traced multipart headers, 401 handling, gallery session state, and the autosave path.
+  - Root cause: A 401 could clear browser credentials without updating the gallery shell, leaving a signed-in-looking UI. Upload errors had no reauthentication path.
+  - Change made: Subscribe the app shell to session changes, protect fresh tokens against stale 401 responses, and resume the selected file or edit once after sign-in.
+  - Why this approach: Preserve the pending action on the same page and retry only known authentication failures.
+- Files touched: Frontend auth and API services, app shell, gallery, upload form, frontend tests, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Full Docker frontend suite, gallery and API probes, container inspection, and `git diff --check`.
+- Results: 15 frontend tests passed, including multipart bearer headers, stale 401 handling, and resuming the same file after sign-in. Gallery, health, and figures returned HTTP 200. No temporary containers were present.
+- Current blockers or risks: The browser flow with an actual account and GLB was not exercised.
+- Important implementation decisions: Keep pending files in memory and avoid redirecting or retrying non-authentication failures automatically.
+
+# AI Used: ChatGPT
+
+- 24-hour sign-in sessions:
+  - Reason: Reduce repeated sign-in prompts on the gallery.
+  - Investigation: Checked the active, example, and fallback token lifetimes.
+  - Root cause: New sessions previously expired after one hour.
+  - Change made: Set the lifetime to 86,400 seconds and recreated the local backend.
+  - Why this approach: Keep explicit configuration and the default consistent.
+- Files touched: Local environment, environment template, backend configuration, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Backend recreation, synthetic token claim check, health probe, and `git diff --check`.
+- Results: A fresh token expires 86,400 seconds after issuance; health returned 200.
+- Current blockers or risks: Previously issued tokens retain their original expiry.
+- Important implementation decisions: Apply the longer lifetime on the next sign-in.
+
+# AI Used: ChatGPT
+
+- Passkey enrollment and sign-in:
+  - Reason: Support device-based sign-in with password fallback.
+  - Investigation: Checked configured origins and the live schema, and reviewed the WebAuthn library and browser contract.
+  - Root cause: Identity supported password sessions only.
+  - Change made: Added a password-confirmed Add a passkey dialog and a passkey action in Sign in, with verified, hostname-bound WebAuthn challenges and public credential storage.
+  - Why this approach: Reuse the existing account and session contract while leaving biometric verification on the device.
+- Files touched: Identity domain and tests, backend requirements and migration, gallery shell and passkey UI and tests, READMEs, and this journal.
+- Database changes or migrations applied: Applied `004_identity_passkeys.sql` to the configured local backend database and verified all four migration checksums.
+- Tests and verification commands run: Docker backend build and restart, 42 backend tests, 17 frontend tests, live challenge, route probes, container inspection, and `git diff --check`.
+- Results: Backend tests verified signed enrollment and authentication fixtures, wrong-origin rejection, password requirement, and replay rejection. Frontend tests passed. The live challenge returned the local hostname and required user verification, and both routes returned 200.
+- Current blockers or risks: No physical-device prompt was tested. The public HTTPS site still requires deployment of these changes.
+- Important implementation decisions: Password fallback stays available. Passkeys are scoped to the hostname, and enrollment on the production hostname is separate from localhost.

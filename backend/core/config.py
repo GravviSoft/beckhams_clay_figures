@@ -14,7 +14,7 @@ def _csv(name, default=""):
 
 class Config:
     SECRET_KEY = os.getenv("APP_SECRET_KEY", "development-only-change-me")
-    AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "3600"))
+    AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "86400"))
     CONNECTION_STRING = os.getenv("CONNECTION_STRING", "").strip()
     DB_SCHEMA = os.getenv("DB_SCHEMA", "").strip()
     CORS_ORIGINS = _csv(

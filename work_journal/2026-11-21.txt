@@ -217,3 +217,129 @@
 - Current blockers or risks: Frontend work is paused until the operator explicitly confirms all live browser editors/forms are saved and closed, as required by the hot-reload safety rule. R2 object URL signing is not part of this first read-only slice, so the initial UI should use graceful placeholders until asset delivery is implemented.
 - Prevent next time: Establish the canonical domain records and authorization-scoped API before building a frontend around mock-only state.
 - Important implementation decisions: The gallery endpoint requires bearer authentication and never exposes another user's figures. The first UI will consume real empty/data states but will not invent upload persistence or public R2 URLs.
+
+# AI Used: ChatGPT
+
+- Development frontend availability diagnosis:
+  - Reason: Determine why the local frontend at `becksclay.localhost` was unavailable.
+  - Investigation: Attempted read-only Compose status and service-log inspection, tested both the frontend and backend health routes through the configured hostname, checked the Docker Unix socket, and sent a direct Docker Engine `_ping` request.
+  - Root cause: Docker Engine was unavailable or unresponsive. Docker CLI status/log commands hung without output, the Docker socket file existed but refused connections, and neither route could connect to port 80. This is below the application layer; no frontend, backend, or Traefik service was reachable for inspection.
+  - Change made: Diagnosis and journal entry only. No source, configuration, container, or service changes were made.
+  - Why this approach: Read-only checks isolated the infrastructure failure without restarting Docker or mutating a development environment the operator may be using.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - `docker compose -f docker-compose.dev.yml ps`
+  - Docker Compose frontend/backend log requests (no daemon response)
+  - HTTP probes for `/` and `/api/health`
+  - Direct Unix-socket request to Docker Engine `/_ping`
+- Results: Frontend and backend returned connection failure (`HTTP 000`); Docker Engine socket refused the direct connection.
+- Current blockers or risks: Docker Desktop/Engine must be running and responsive before Compose services, Traefik routes, or application logs can be evaluated. Restarting Docker Desktop was not authorized by this diagnostic request.
+- Prevent next time: Check `docker info` or the Engine `/_ping` endpoint before debugging application containers when every local route is simultaneously unavailable.
+- Important implementation decisions: No application fix is indicated by current evidence; restore Docker first, then recheck Compose services and routes.
+
+# AI Used: ChatGPT
+
+- Docker/Traefik QA escalation:
+  - Reason: Perform full QA after the operator reported shared Traefik was shown as running despite the application routes being unreachable.
+  - Investigation: Confirmed the active Docker context is `desktop-linux`; inspected Docker Desktop processes and status; directly pinged the Engine socket; retried container/Compose enumeration and routed probes; inspected Docker Desktop backend and VM console logs.
+  - Root cause: Docker Desktop's UI/backend processes are running, but the Docker Engine/containerd path is wedged. Engine `_ping` intermittently succeeds while container-list requests hang for roughly five minutes. Logs report health-check startup timeouts, inactive containerd streams, closed FIFOs, and `connecting to /var/run/docker.raw.sock ... operation was canceled`. Traefik may be displayed from stale UI state but cannot serve traffic while the engine/network path is unhealthy.
+  - Change made: Diagnosis only. No application, container, network, or Docker Desktop restart has been performed.
+  - Why this approach: Repository rules require stating restart impact and waiting for explicit confirmation before restarting services. A Docker Desktop restart affects every local container, not only this project.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Docker context and socket inspection.
+  - `docker desktop status`.
+  - Direct Docker Engine `/_ping` and container-list requests.
+  - Docker/Compose status, logs, and routed HTTP probes.
+  - Docker Desktop backend and VM console log review.
+- Results: Docker Desktop reports `running`, but Docker Engine container enumeration and network operations are nonfunctional/intermittent. Application-level QA cannot proceed reliably until Docker Desktop is restarted.
+- Current blockers or risks: Restarting Docker Desktop will temporarily stop every local container, including shared Traefik and sibling applications. Explicit operator confirmation is required.
+- Prevent next time: Treat a successful Docker Desktop UI status or `_ping` as insufficient when `/containers/json` hangs; inspect the raw-socket and containerd errors early.
+- Important implementation decisions: After restart approval, restart Docker Desktop, wait for Engine stability, start only the Beck's Clay project if needed, then verify container cleanup plus frontend and backend routes through shared Traefik.
+
+# AI Used: ChatGPT
+
+- Public gallery with upload-only authorization investigation:
+  - Reason: Make the main page a gallery that anyone can view while reserving figure uploads for the owner through a password-protected action.
+  - Investigation: Re-read `README.md` end-to-end after the prior turn was interrupted; read the full available dated journal history and journal standard; reviewed `backend/app_schema.py`, both registered migrations, the clay-gallery backend domain, frontend routing/layout, and authentication references. Confirmed the repository has only one dated journal file, `2026-11-21.txt`.
+  - Root cause: The current root route is nested under `ProtectedRoute`, and `GET /api/figures` requires a bearer token and filters by the authenticated user's ID. That architecture makes the gallery itself private instead of limiting authentication to authoring actions.
+  - Change made: Investigation and decision record only so far. No backend, frontend, schema, migration, service, or database change has been made in this workstream yet.
+  - Why this approach: Public reads and authenticated writes are separate authorization policies. Reusing the existing password-backed identity and bearer-token system for an Upload action keeps enforcement on the backend; a frontend-only password or shared secret would not securely authorize uploads.
+
+- Files touched:
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - Read `README.md` in full.
+  - Read `work_journal/README.md` and the available `work_journal/2026-11-21.txt` history.
+  - Read `backend/app_schema.py`, migrations `001` and `002`, clay-gallery routes/service/repository, and current frontend route/layout files.
+  - Searched backend, frontend, and architecture documentation for authentication, gallery, figure, and upload behavior.
+- Results: Confirmed the canonical schema contains `becks_clay.figures` and `becks_clay.assets`, each figure still has an owner, and no upload API/UI exists yet. The safe target is a public gallery read endpoint plus an owner-only upload workflow that prompts for existing credentials when needed.
+- Current blockers or risks: The README requires explicit operator confirmation that all live browser editors/forms are saved and closed before changing watched frontend source. Docker was also unhealthy in the latest journal entry, so runtime verification may remain blocked until it is responsive.
+- Prevent next time: Model gallery visibility and authoring permission as separate backend policies from the beginning.
+- Important implementation decisions: Keep canonical ownership and existing password authentication. Remove login as the public landing experience; expose authentication only from the Upload action. Do not store an upload password in frontend code or rely on client-side gating.
+
+# AI Used: ChatGPT
+
+- Public gallery backend read policy:
+  - Reason: Allow anonymous visitors to load gallery data while preserving authentication for future upload/authoring endpoints.
+  - Investigation: Traced the clay-gallery route through its service and repository and reviewed the focused route test and API documentation.
+  - Root cause: `GET /api/figures` was decorated with `require_auth` and the repository filtered every result by the current user's ID, coupling public viewing to owner authentication.
+  - Change made: Removed authentication from the read-only gallery route and changed its service/repository query to list all figures without returning owner identity. Updated the focused route test and endpoint documentation to declare the read public. Figure ownership remains unchanged in the schema for secure authoring.
+  - Why this approach: Public read access is the requested product behavior, while write access remains a separate backend-enforced capability. This avoids weakening the ownership model or exposing a client-side shared secret.
+
+- Files touched:
+  - `backend/domains/clay_gallery/routes.py`
+  - `backend/domains/clay_gallery/service.py`
+  - `backend/domains/clay_gallery/repository.py`
+  - `backend/domains/clay_gallery/README.md`
+  - `backend/tests/test_clay_gallery_routes.py`
+  - `README.md`
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - `python3 -m compileall -q backend`
+  - Attempted `docker compose -f docker-compose.dev.yml exec -T backend pytest -q backend/tests/test_clay_gallery_routes.py`.
+- Results: Backend Python compilation passed. The required Dockerized test could not run because the backend service is not running. No npm command was run on the host or elsewhere.
+- Current blockers or risks: Frontend source changes await explicit confirmation that live browser editors/forms are saved and closed. Backend runtime verification also requires starting/restarting the currently stopped service, which requires advance notice and confirmation under the project safety rule.
+- Prevent next time: Keep read visibility and write authorization separate in route tests and API documentation.
+- Important implementation decisions: `GET /api/figures` is public and returns the complete gallery. Future create/upload URL endpoints must use `require_auth` and derive ownership from the authenticated actor, never request payload ownership.
+
+# AI Used: ChatGPT
+
+- Public gallery landing page and upload-access entry:
+  - Reason: Replace the login-first application experience with a gallery anyone can browse while keeping the path into upload tools password protected.
+  - Investigation: Reviewed the frontend router, shared layout, authentication/session transport, API client, loader and status-state standards, authenticated UI primitives, global styles, existing app test, and current package manifest. Confirmed there was no clay-gallery frontend domain and no secure upload API or R2 signed-URL service to back a real upload form.
+  - Root cause: `/` rendered the example dashboard inside `ProtectedRoute`; the layout advertised Sign in and Register as the primary anonymous actions; no gallery UI consumed the clay endpoint.
+  - Change made: Made `/` a public gallery route, created the `clay_gallery` frontend domain and API boundary, added loading/error/empty/data treatments, and replaced public sign-in/register navigation with one Upload action. Upload remembers `/upload`, prompts for existing email/password credentials, and then enters a protected authoring workspace. Removed the public registration route from the app UI and reframed login as upload access. Updated the app test and architecture/domain documentation.
+  - Why this approach: It makes viewing frictionless and keeps authorization at the backend/session boundary. The protected workspace is explicit about the missing R2 form rather than offering an upload interaction that cannot persist securely yet.
+
+- Files touched:
+  - `frontend/src/App.jsx`
+  - `frontend/src/App.test.jsx`
+  - `frontend/src/app/AppLayout.jsx`
+  - `frontend/src/app/AppLayout.css`
+  - `frontend/src/app/README.md`
+  - `frontend/src/domains/README.md`
+  - `frontend/src/domains/clay_gallery/ClayGalleryPage.jsx`
+  - `frontend/src/domains/clay_gallery/ClayGalleryPage.css`
+  - `frontend/src/domains/clay_gallery/galleryApi.js`
+  - `frontend/src/domains/identity/AuthForm.jsx`
+  - `frontend/src/domains/identity/LoginPage.jsx`
+  - `frontend/src/workspaces/upload/UploadWorkspace.jsx`
+  - `docs/architecture/domain-ownership.md`
+  - `work_journal/2026-11-21.txt`
+- Database changes or migrations applied: None.
+- Tests and verification commands run:
+  - `git diff --check`
+  - Reviewed the resulting changed/untracked file set and architecture ownership documentation.
+- Results: Diff whitespace validation passed. The new route and gallery test have not yet run because the frontend container is stopped, and project rules prohibit host npm. No npm command was run on the host.
+- Current blockers or risks: A real upload remains intentionally unimplemented until authenticated create/presign/finalize endpoints and R2 delivery exist. Authentication alone will not be sufficient if arbitrary accounts can still be registered through the backend; the upload API must additionally enforce an owner/uploader policy. Starting the stopped Compose services will reload/recreate application containers and requires explicit operator confirmation before runtime testing.
+- Prevent next time: Build the public read route and frontend domain before wrapping the entire application in an authentication gate; distinguish authenticated users from authorized uploaders.
+- Important implementation decisions: Public visitors never see a generic login/register call to action. Upload is the only authentication entry point. Gallery cards use deliberate placeholders until R2 produces safe asset URLs; raw private storage keys are not treated as browser URLs.

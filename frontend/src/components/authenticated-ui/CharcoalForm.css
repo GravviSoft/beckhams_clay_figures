@@ -1,0 +1,71 @@
+.app-form-dialog.app-form-dialog--charcoal.p-dialog {
+  width: min(var(--app-charcoal-dialog-width, 480px), calc(100vw - 24px));
+  border: 1px solid #414348;
+  color-scheme: dark;
+}
+
+.app-form-dialog--charcoal .p-dialog-header,
+.app-form-dialog--charcoal .p-dialog-content {
+  background: #242527;
+  color: #f1f2f3;
+}
+
+.app-form-dialog--charcoal .p-dialog-header { padding: 16px 18px 12px; }
+.app-form-dialog--charcoal .p-dialog-content { padding: 4px 18px 18px; }
+.app-form-dialog--charcoal .p-dialog-header-icon { color: #c7cad0; }
+.app-form-dialog--charcoal .p-dialog-header-icon:hover { background: #393b41; color: #fff; }
+
+.app-charcoal-form {
+  display: grid;
+  gap: 12px;
+  --app-color-primary: #535fbc;
+  --app-color-primary-hover: #4552a5;
+}
+
+.app-charcoal-form fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #404246;
+  border-radius: 8px;
+}
+.app-charcoal-form .app-action-group { flex-wrap: wrap; }
+
+.app-charcoal-form .app-field { gap: 5px; }
+.app-charcoal-form .app-field > label { color: #e0e2e6; font-size: .72rem; }
+.app-charcoal-form .app-field > label em { color: #b1b5bd; }
+
+.app-charcoal-form .app-field .p-inputtext,
+.app-charcoal-form input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid #54575e;
+  background: #1a1b1d;
+  color: #f1f2f3;
+  border-radius: 6px;
+  font-size: .9rem;
+}
+.app-charcoal-form .app-field textarea.p-inputtext { height: auto; padding: 8px; resize: vertical; }
+.app-charcoal-form .app-field .p-inputtext:focus,
+.app-charcoal-form input[type="file"]:focus-visible { border-color: #aebcff; outline: 2px solid #aebcff; outline-offset: 1px; }
+.app-charcoal-form input[type="file"] { padding: 4px; }
+.app-charcoal-form input::file-selector-button {
+  margin-inline-end: 8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  color: #f1f2f3;
+  background: #393b41;
+  font: inherit;
+  cursor: pointer;
+}
+.app-form-dialog--charcoal .app-button--text.p-button { color: #d8dbe2; }
+.app-form-dialog--charcoal .app-button--text.p-button:hover:not(:disabled) { color: #fff; background: #393b41; }
+.app-form-dialog--charcoal .status-state--error { --app-color-danger: #ffaaa4; }
+
+@media (max-width: 700px) {
+  .app-charcoal-form .app-field .p-inputtext, .app-charcoal-form input[type="file"] { font-size: 16px; }
+}
