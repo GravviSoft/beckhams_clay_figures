@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import UploadWorkspace from '../../workspaces/upload/UploadWorkspace';
 import PageLoader from '../../components/PageLoader';
 import StatusState from '../../components/StatusState';
 import { isUnauthorizedError, UnauthorizedError } from '../../services/api';
 import { getAuthToken } from '../../services/auth';
-import { featureFigure, figureAssetUrl, listFigures, saveFigure } from './galleryApi';
+import { featureFigure, figureAssetUrl, listFigures, saveFigure, saveModelThumbnail } from './galleryApi';
+import { modelThumbnail } from './modelThumbnail';
 import ViewerControls from './ViewerControls';
 import './ClayGalleryPage.css';
 
@@ -36,13 +37,35 @@ function loadViewer() {
   return viewerReady;
 }
 
-function ModelPreview({ file, source, title, captureThumbnail }) {
+function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }) {
   const [url, setUrl] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  const [progress, setProgress] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [orbit, setOrbit] = useState(null);
   const viewerRef = useRef(null);
   const originalView = useRef(null);
+
+  useEffect(() => {
+    if (loaded || error) return undefined;
+    const timeout = window.setTimeout(() => {
+      setError('The model stopped loading. You can retry the download.');
+    }, 90000);
+    return () => window.clearTimeout(timeout);
+  }, [attempt, error, loaded, progress]);
+
+  useEffect(() => {
+    const element = viewerRef.current;
+    if (!url || !element) return undefined;
+    const reportProgress = ({ detail }) => {
+      if (Number.isFinite(detail?.totalProgress)) {
+        setProgress(Math.min(100, Math.max(0, Math.floor(detail.totalProgress * 100))));
+      }
+    };
+    element.addEventListener('progress', reportProgress);
+    return () => element.removeEventListener('progress', reportProgress);
+  }, [url]);
 
   useEffect(() => {
     const element = viewerRef.current;
@@ -54,7 +77,12 @@ function ModelPreview({ file, source, title, captureThumbnail }) {
 
   useEffect(() => {
     let active = true;
-    const objectUrl = file ? URL.createObjectURL(file) : source;
+    let objectUrl = file ? URL.createObjectURL(file) : source;
+    if (!file && attempt) {
+      const retryUrl = new URL(source, window.location.href);
+      retryUrl.searchParams.set('retry', String(attempt));
+      objectUrl = retryUrl.href;
+    }
     loadViewer().then(() => {
       if (active) setUrl(objectUrl);
     }).catch(() => {
@@ -64,7 +92,7 @@ function ModelPreview({ file, source, title, captureThumbnail }) {
       active = false;
       if (file) URL.revokeObjectURL(objectUrl);
     };
-  }, [file, source]);
+  }, [file, source, attempt]);
 
   function bindViewer(element) {
     viewerRef.current = element;
@@ -79,6 +107,7 @@ function ModelPreview({ file, source, title, captureThumbnail }) {
       };
       setOrbit(initialOrbit);
       setLoaded(true);
+      onReady?.(element);
       if (captureThumbnail) {
         try {
           captureThumbnail(element.toDataURL('image/webp', 0.75));
@@ -107,15 +136,43 @@ function ModelPreview({ file, source, title, captureThumbnail }) {
     setCameraGoal(element, 'camera-orbit', `${angles} ${element.getCameraOrbit().radius}m`);
   }
 
-  if (error) return <StatusState type="error" title="The 3D preview could not load" message={error} />;
+  if (error) return (
+    <div className="clay-stage__load-error">
+      {poster && <img className="clay-stage__fallback" src={poster} alt={title} />}
+      <StatusState type="error" title="The 3D preview could not load" message={error} />
+      <button type="button" onClick={() => {
+        setUrl('');
+        setProgress(null);
+        setLoaded(false);
+        setOrbit(null);
+        setError('');
+        setAttempt((value) => value + 1);
+      }}>Retry model</button>
+    </div>
+  );
   return (
     <>
       <div className="clay-model-viewport">
+        {!loaded && poster && <img className="clay-stage__poster" src={poster} alt={title} />}
         {url && (
           <model-viewer ref={bindViewer} src={url} alt={title || file?.name}
-            camera-controls touch-action="pan-y" min-field-of-view="15deg" shadow-intensity="0.8" />
+            loading="eager" camera-controls touch-action="pan-y" min-field-of-view="15deg" shadow-intensity="0.8" />
         )}
-        {!loaded && <div className="clay-stage__loading"><PageLoader compact label="Loading 3D preview" /></div>}
+        {!loaded && (
+          <div className={poster ? 'clay-stage__loading clay-stage__loading--with-poster' : 'clay-stage__loading'}>
+            {progress > 0 && progress < 100 ? (
+              <>
+                <p>Loading model… {progress}%</p>
+                <progress aria-label="Loading 3D preview" max="100" value={progress} />
+              </>
+            ) : (
+              <>
+                <PageLoader compact label="Loading 3D preview" />
+                <p>{progress === 100 ? 'Preparing model…' : 'Loading model…'}</p>
+              </>
+            )}
+          </div>
+        )}
       </div>
       {loaded && orbit && <ViewerControls orbit={orbit}
         onZoom={(step) => viewerRef.current.zoom(step)} onReset={resetView} onAxis={alignAxis} />}
@@ -137,6 +194,10 @@ export default function ClayGalleryPage() {
   const editing = previews.find(({ id }) => id === editId);
   const savedEditing = figures?.find(({ id }) => id === savedEditId);
   const [uploadedId, setUploadedId] = useState(null);
+  const [thumbnailViewer, setThumbnailViewer] = useState(null);
+  const thumbnailAttempts = useRef(new Set());
+  const thumbnailInFlight = useRef(new Set());
+  const localThumbnails = useRef(new Map());
   const [featuredPreviewId, setFeaturedPreviewId] = useState(null);
   const [featurePending, setFeaturePending] = useState(false);
   const [featureError, setFeatureError] = useState('');
@@ -145,8 +206,60 @@ export default function ClayGalleryPage() {
   const preview = previews.find(({ id }) => id === previewId);
   const [fileError, setFileError] = useState('');
   const figure = figures?.find(({ id }) => String(id) === (uploadedId ?? params.get('figure'))) ?? figures?.[0];
-  const hasModel = figure?.assets?.some(({ asset_type }) => asset_type === 'display_model');
+  const webAsset = figure?.assets?.find(({ asset_type }) => asset_type === 'web_model');
+  const modelAsset = webAsset ?? figure?.assets?.find(({ asset_type }) => asset_type === 'display_model');
+  const hasModel = Boolean(modelAsset);
+  const posterAsset = figure?.assets?.find(({ asset_type }) => asset_type === 'gallery_poster')
+    ?? figure?.assets?.find(({ asset_type }) => asset_type === 'model_thumbnail');
+  const stagePoster = posterAsset
+    ? `${figureAssetUrl(figure.id, posterAsset.asset_type)}?v=${encodeURIComponent(figure.updated_at ?? '')}` : undefined;
   const madeOn = preview ? preview.madeOn : figure?.made_on;
+  const visibleFigureId = !preview && hasModel ? figure.id : null;
+  const canGenerateThumbnail = editableFigureIds.includes(visibleFigureId)
+    && !figure?.assets?.some(({ asset_type }) => ['gallery_poster', 'model_thumbnail'].includes(asset_type));
+
+  const persistThumbnail = useCallback(async (id, capture) => {
+    if (thumbnailInFlight.current.has(id)) return;
+    thumbnailInFlight.current.add(id);
+    try {
+      const image = await capture();
+      if (!image) return;
+      await saveModelThumbnail(id, image);
+      setFigures((items) => items?.map((item) => item.id === id
+        && !item.assets.some(({ asset_type }) => asset_type === 'model_thumbnail')
+        ? { ...item, assets: [...item.assets, { asset_type: 'model_thumbnail' }] } : item));
+    } finally {
+      thumbnailInFlight.current.delete(id);
+    }
+  }, []);
+
+  const generateThumbnail = useCallback((id, viewer) => {
+    if (!viewer?.isConnected) return Promise.resolve();
+    return persistThumbnail(id, () => modelThumbnail(viewer));
+  }, [persistThumbnail]);
+
+  function rememberLocalThumbnail(id, viewer) {
+    if (signedIn && !localThumbnails.current.has(id)) {
+      localThumbnails.current.set(id, modelThumbnail(viewer).catch(() => null));
+    }
+  }
+
+  function attachLocalThumbnail(draftId, figureId) {
+    const image = localThumbnails.current.get(draftId);
+    localThumbnails.current.delete(draftId);
+    if (image) persistThumbnail(figureId, () => image).catch(() => {
+      // The owner can retry from the saved model.
+    });
+  }
+
+  useEffect(() => {
+    if (!canGenerateThumbnail || thumbnailViewer?.id !== visibleFigureId || !thumbnailViewer.element.isConnected
+        || thumbnailAttempts.current.has(visibleFigureId)) return;
+    thumbnailAttempts.current.add(visibleFigureId);
+    generateThumbnail(visibleFigureId, thumbnailViewer.element).catch(() => {
+      // Edit exposes a retry if capture or storage is unavailable.
+    });
+  }, [canGenerateThumbnail, generateThumbnail, thumbnailViewer, visibleFigureId]);
 
   useEffect(() => {
     let active = true;
@@ -192,7 +305,9 @@ export default function ClayGalleryPage() {
     if (draft.poster) form.set('poster', draft.poster);
     try {
       if (!token) throw new UnauthorizedError();
-      const { id } = await saveFigure(form);
+      const { id } = await saveFigure(form, (progress) => {
+        setPreviews((items) => items.map((item) => item.id === draft.id ? { ...item, progress } : item));
+      });
       markEditable(id, token);
       const saved = {
         id, character_name: draft.name, made_on: draft.madeOn, description: draft.description,
@@ -204,6 +319,8 @@ export default function ClayGalleryPage() {
         return [...featured, saved, ...remaining.filter((item) => !item.featured)];
       });
       setPreviews((items) => items.filter(({ id: localId }) => localId !== draft.id));
+      if (draft.poster) localThumbnails.current.delete(draft.id);
+      else attachLocalThumbnail(draft.id, id);
       setFeaturedPreviewId((current) => current === draft.id ? null : current);
       if (activeUpload.current === draft.id) {
         setUploadedId(String(id));
@@ -221,6 +338,7 @@ export default function ClayGalleryPage() {
   }
 
   function deletePreview(id) {
+    localThumbnails.current.delete(id);
     const remaining = previews.filter((item) => item.id !== id);
     setPreviews(remaining);
     if (previewId === id) setPreviewId(remaining[0]?.id ?? null);
@@ -255,6 +373,7 @@ export default function ClayGalleryPage() {
 
   async function figureSaved(id) {
     markEditable(id);
+    const capture = localThumbnails.current.get(editId);
     if (editId !== null) deletePreview(editId);
     setEditId(null);
     setSavedEditId(null);
@@ -263,6 +382,7 @@ export default function ClayGalleryPage() {
     setError('');
     try {
       setFigures(await listFigures());
+      if (capture) await persistThumbnail(id, () => capture).catch(() => {});
     } catch {
       setError('Figure saved. Refresh the gallery to load it.');
     }
@@ -277,25 +397,35 @@ export default function ClayGalleryPage() {
     <section className="clay-studio" aria-label="Clay figure gallery">
       <div className="clay-stage">
         <header className="clay-stage__heading">
-          <h1>{preview?.name || figure?.character_name || 'Beck’s clay collection'}</h1>
-          {madeOn && <p><time dateTime={madeOn}>{madeOn}</time></p>}
-          {(preview || hasModel) && <p>Drag to rotate · Scroll or pinch to zoom</p>}
+          <div className="clay-stage__title">
+            <h1>{preview?.name || figure?.character_name || 'Beck’s clay collection'}</h1>
+            {madeOn && <time className="clay-stage__date" dateTime={madeOn}>{madeOn}</time>}
+          </div>
         </header>
         <div className="clay-stage__view">
           {preview ? <ModelPreview key={preview.id} file={preview.file}
+            onReady={(element) => rememberLocalThumbnail(preview.id, element)}
             captureThumbnail={preview.thumbnail ? undefined : (thumbnail) => {
               setPreviews((items) => items.map((item) => item.id === preview.id
                 ? { ...item, thumbnail } : item));
             }} /> : hasModel ? (
-              <ModelPreview key={`saved-${figure.id}`} title={figure.character_name}
-                source={figureAssetUrl(figure.id, 'display_model')} />
+              <ModelPreview key={`saved-${figure.id}-${modelAsset.asset_type}`} title={figure.character_name}
+                source={figureAssetUrl(figure.id, modelAsset.asset_type)} poster={stagePoster}
+                onReady={(element) => setThumbnailViewer({ id: figure.id, element })} />
+            ) : stagePoster ? (
+              <img className="clay-stage__fallback" src={stagePoster} alt={figure.character_name} />
             ) : (
             <p>{figure ? '3D preview unavailable for this figure.' : 'Select a figure to explore it.'}</p>
           )}
         </div>
-        {(preview ? preview.description : figure?.description) && (
-          <p className="clay-stage__caption">{preview ? preview.description : figure.description}</p>
-        )}
+        <div>
+          {(preview || hasModel) && (
+            <p className="clay-stage__gesture-hint">Drag to rotate · Scroll or pinch to zoom</p>
+          )}
+          {(preview ? preview.description : figure?.description) && (
+            <p className="clay-stage__caption">{preview ? preview.description : figure.description}</p>
+          )}
+        </div>
       </div>
       <aside className="clay-rail" aria-label="Collection">
         <div className="clay-rail__heading">
@@ -324,7 +454,7 @@ export default function ClayGalleryPage() {
         {!error && figures === null && <PageLoader compact label="Loading clay figure gallery" />}
         <div className="clay-rail__grid">
           {previews.map((draft) => {
-            const { id, name, thumbnail, saving, saveError, needsSignIn } = draft;
+            const { id, name, thumbnail, saving, saveError, needsSignIn, progress } = draft;
             return (
             <article className={`clay-preview-card${featuredPreviewId === id ? ' clay-preview-card--featured' : ''}`} key={id}
               onKeyDown={(event) => {
@@ -352,7 +482,12 @@ export default function ClayGalleryPage() {
                 <i className="pi pi-ellipsis-h" aria-hidden="true" />
               </button>
               </div>
-              {saving && <p className="clay-card-save-status" role="status">Saving…</p>}
+              {saving && <div className="clay-card-save-status">
+                <p role="status">{typeof progress === 'number'
+                  ? progress < 100 ? `Uploading… ${progress}%` : 'Verifying upload…'
+                  : 'Saving…'}</p>
+                {typeof progress === 'number' && <progress aria-label={`Upload progress for ${name}`} value={progress} max="100" />}
+              </div>}
               {saveError && <p className="clay-card-save-status" role="alert">Not saved. {saveError} Use Edit to retry.</p>}
               {needsSignIn && <div className="clay-card-save-status">
                 <span>Upload paused. </span>
@@ -371,8 +506,21 @@ export default function ClayGalleryPage() {
             </article>
           );
           })}
-          {figures?.map((item) => (
-            <article className={`clay-preview-card${item.featured && !featuredPreviewId ? ' clay-preview-card--featured' : ''}`} key={item.id}>
+          {figures?.map((item) => {
+            const canEdit = editableFigureIds.includes(item.id);
+            const savedMenuId = `saved-${item.id}`;
+            const menuOpen = menuId === savedMenuId;
+            const thumbnailType = item.assets?.some(({ asset_type }) => asset_type === 'gallery_poster')
+              ? 'gallery_poster'
+              : item.assets?.some(({ asset_type }) => asset_type === 'model_thumbnail') ? 'model_thumbnail' : null;
+            return (
+            <article className={`clay-preview-card${item.featured && !featuredPreviewId ? ' clay-preview-card--featured' : ''}`} key={item.id}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && menuOpen) {
+                  setMenuId(null);
+                  event.currentTarget.querySelector('.clay-preview-card__more')?.focus();
+                }
+              }}>
             <button className="clay-preview-card__select" type="button" aria-pressed={!preview && figure?.id === item.id}
               onClick={() => {
                 activeUpload.current = null;
@@ -386,24 +534,41 @@ export default function ClayGalleryPage() {
                 setMenuId(null);
               }}>
               <span className="clay-preview-card__image">
-                {item.assets?.some(({ asset_type }) => asset_type === 'gallery_poster')
-                  ? <img className="clay-saved-poster" src={`${figureAssetUrl(item.id, 'gallery_poster')}?v=${encodeURIComponent(item.updated_at ?? '')}`} alt="" loading="lazy" />
+                {thumbnailType
+                  ? <img className="clay-saved-poster" src={`${figureAssetUrl(item.id, thumbnailType)}?v=${encodeURIComponent(item.updated_at ?? '')}`} alt="" loading="lazy" />
                   : <i className="pi pi-box" aria-hidden="true" />}
               </span>
               <span className="clay-preview-card__name" title={item.character_name}>{item.character_name}</span>
             </button>
-            {editableFigureIds.includes(item.id) && <button className="clay-preview-card__more" type="button"
-              title="Edit figure" aria-label={`Edit ${item.character_name}`} onClick={() => setSavedEditId(item.id)}>
-              <i className="pi pi-pencil" aria-hidden="true" />
-            </button>}
-            {((canFeature && editableFigureIds.includes(item.id)) || item.featured) && <button className="clay-preview-card__star" type="button" title="Feature model"
+            {canEdit && (
+              <>
+                <button className="clay-preview-card__more" type="button" title="Figure options"
+                  aria-label={`Options for ${item.character_name}`} aria-expanded={menuOpen}
+                  onClick={() => setMenuId(menuOpen ? null : savedMenuId)}>
+                  <i className="pi pi-ellipsis-h" aria-hidden="true" />
+                </button>
+                {menuOpen && <div className="clay-preview-card__actions">
+                  <button type="button" aria-label={`Edit ${item.character_name}`} onClick={() => {
+                    activeUpload.current = null;
+                    setPreviewId(null);
+                    setUploadedId(String(item.id));
+                    setSavedEditId(item.id);
+                    setMenuId(null);
+                  }}>
+                    <i className="pi pi-pencil" aria-hidden="true" /> Edit
+                  </button>
+                </div>}
+              </>
+            )}
+            {(canEdit || item.featured) && <button className="clay-preview-card__star" type="button" title="Feature model"
               aria-label={`Feature model: ${item.character_name}`} aria-pressed={Boolean(item.featured && !featuredPreviewId)}
-              disabled={!canFeature || featurePending || item.featured}
+              disabled={!canFeature || !canEdit || featurePending || item.featured}
               onClick={() => featureSaved(item)}>
               <i className={`pi ${item.featured && !featuredPreviewId ? 'pi-star-fill' : 'pi-star'}`} aria-hidden="true" />
             </button>}
             </article>
-          ))}
+          );
+          })}
         </div>
       </aside>
       {editing && <UploadWorkspace figure={editing} signedIn={signedIn}
@@ -411,7 +576,9 @@ export default function ClayGalleryPage() {
       {savedEditing && <UploadWorkspace persisted figure={{
         id: savedEditing.id, name: savedEditing.character_name, madeOn: savedEditing.made_on ?? '',
         description: savedEditing.description ?? '',
-      }} onClose={() => setSavedEditId(null)} onSaved={figureSaved} onReauthenticate={requestSignIn} />}
+      }} onClose={() => setSavedEditId(null)} onSaved={figureSaved} onReauthenticate={requestSignIn}
+        onGenerateThumbnail={canGenerateThumbnail && savedEditing.id === thumbnailViewer?.id
+          ? () => generateThumbnail(savedEditing.id, thumbnailViewer.element) : undefined} />}
     </section>
   );
 }

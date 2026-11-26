@@ -7,6 +7,8 @@
 .auth-form--embedded .auth-form__error { --app-color-danger: #ffaaa4; }
 .auth-form__error { margin: 0; color: var(--app-color-danger); font-size: .75rem; }
 .auth-form__alternate { margin: 12px 0 0; color: var(--app-muted); font-size: .75rem; }
+.auth-form__passkey-option { display: flex; align-items: center; gap: 7px; color: #c4c6ce; font-size: .78rem; }
+.auth-form__passkey-option input { margin: 0; accent-color: #aebcff; }
 .passkey-error { --app-color-danger: #ffaaa4; }
 .passkey-sign-in { display: grid; gap: 8px; }
 .passkey-sign-in__divider {

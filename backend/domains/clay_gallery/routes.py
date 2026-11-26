@@ -2,7 +2,19 @@
 
 from flask import Blueprint, Response, g, jsonify, request
 
-from . import service
+from core.errors import ValidationError
+
+from . import direct_upload, service
+
+
+def upload_body():
+    request.max_content_length = 16 * 1024
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        raise ValidationError("Upload details are required.")
+    if any(not isinstance(body.get(name, ""), str) for name in ("character_name", "made_on", "description")):
+        raise ValidationError("Upload details are invalid.")
+    return body
 
 
 def create_clay_gallery_blueprint(*, get_db, require_auth):
@@ -32,6 +44,25 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
         figure_id = service.create_figure(get_db, g.user_id, request.form, request.files)
         return jsonify(id=figure_id), 201
 
+    @blueprint.post("/uploads")
+    @require_auth
+    def start_upload():
+        response = jsonify(direct_upload.start_upload(g.user_id, upload_body()))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @blueprint.post("/uploads/finish")
+    @require_auth
+    def finish_upload():
+        return jsonify(id=direct_upload.finish_upload(get_db, g.user_id, upload_body())), 201
+
+    @blueprint.put("/<int:figure_id>/thumbnail")
+    @require_auth
+    def save_thumbnail(figure_id):
+        request.max_content_length = service.THUMBNAIL_LIMIT + 64 * 1024
+        service.save_model_thumbnail(get_db, figure_id, g.user_id, request.files.get("thumbnail"))
+        return "", 204
+
     @blueprint.patch("/<int:figure_id>")
     @require_auth
     def update_figure(figure_id):
@@ -45,7 +76,8 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
         response = Response(body.iter_chunks(64 * 1024), content_type=asset["content_type"])
         response.content_length = asset["size_bytes"]
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Cache-Control"] = "public, max-age=300"
+        max_age = 86400 if asset_type in {"display_model", "web_model"} else 300
+        response.headers["Cache-Control"] = f"public, max-age={max_age}"
         response.call_on_close(body.close)
         return response
 

@@ -14,6 +14,7 @@ from core.errors import DomainError, NotFoundError, ValidationError
 from . import repository, storage
 
 POSTER_LIMIT = 5 * 1024 * 1024
+THUMBNAIL_LIMIT = 512 * 1024
 
 
 def model_upload_limit():
@@ -62,14 +63,16 @@ def figure_details(form):
 
 
 def read_asset(file, asset_type):
-    model = asset_type == "display_model"
-    limit = model_upload_limit() if model else POSTER_LIMIT
+    model = asset_type in {"display_model", "web_model"}
+    limit = model_upload_limit() if model else THUMBNAIL_LIMIT if asset_type == "model_thumbnail" else POSTER_LIMIT
     stream = file.stream
     size = stream.seek(0, os.SEEK_END)
     stream.seek(0)
     if not size:
         raise ValidationError("Choose a file that is not empty.")
     if size > limit:
+        if asset_type == "model_thumbnail":
+            raise ValidationError("The generated thumbnail exceeds 512 KB.")
         raise ValidationError(f"This file exceeds the configured {limit // (1024 * 1024)} MB upload limit.")
     header = stream.read(12)
     stream.seek(0)
@@ -116,13 +119,30 @@ def create_figure(get_db, owner_id, form, files):
 
 
 def display_asset(get_db, figure_id, asset_type):
-    if asset_type not in {"display_model", "gallery_poster"}:
+    if asset_type not in {"display_model", "web_model", "gallery_poster", "model_thumbnail"}:
         raise NotFoundError("Figure asset not found.")
     with transaction(get_db) as connection:
         asset = repository.find_display_asset(connection, figure_id, asset_type)
     if not asset:
         raise NotFoundError("Figure asset not found.")
     return asset, storage.open_asset(asset["storage_key"])
+
+
+def save_model_thumbnail(get_db, figure_id, owner_id, file):
+    if not file:
+        raise ValidationError("A thumbnail image is required.")
+    asset, stream = read_asset(file, "model_thumbnail")
+    try:
+        with transaction(get_db) as connection:
+            created = repository.add_model_thumbnail(connection, figure_id, owner_id, asset)
+            if created is None:
+                raise NotFoundError("Figure not found.")
+            if created:
+                client, bucket = storage.bucket_client()
+                client.put_object(Bucket=bucket, Key=asset[1], Body=stream,
+                                  ContentType=asset[3], ContentLength=asset[4])
+    except (BotoCoreError, ClientError) as error:
+        raise storage.unavailable() from error
 
 
 def update_figure(get_db, figure_id, owner_id, form, files):

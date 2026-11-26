@@ -35,6 +35,8 @@ MIGRATIONS = [
     "002_clay_gallery.sql",
     "003_gallery_feature.sql",
     "004_identity_passkeys.sql",
+    "005_model_thumbnails.sql",
+    "006_web_model_asset.sql",
 ]
 
 

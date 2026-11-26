@@ -47,6 +47,69 @@ def test_large_glb_is_validated_without_buffering_the_model(monkeypatch):
             service.read_asset(file, "display_model")
 
 
+def test_direct_upload_requires_verified_staging_and_finalizes_once(client, auth_headers, monkeypatch):
+    size = 24
+    published = {}
+    copies = []
+    deletes = []
+
+    class Bucket:
+        def generate_presigned_url(self, _operation, *, Params, ExpiresIn):
+            assert Params["Key"].startswith("staging/") and Params["ContentLength"] == size
+            return "https://storage.example.test/staged"
+
+        def head_object(self, **_):
+            return {"ContentLength": size, "ContentType": "model/gltf-binary", "ETag": '"etag"'}
+
+        def get_object(self, **kwargs):
+            assert kwargs["Range"] == "bytes=0-11" and kwargs["IfMatch"] == '"etag"'
+            return {"Body": BytesIO(pack("<4sII", b"glTF", 2, size))}
+
+        def copy_object(self, **kwargs):
+            copies.append(kwargs)
+
+        def delete_object(self, **kwargs):
+            deletes.append(kwargs["Key"])
+
+    def insert(_, owner_id, details, assets):
+        assert owner_id == 7 and details[0] == "Bowser"
+        published[assets[0][1]] = {"id": 4}
+        return 4
+
+    monkeypatch.setattr(storage, "bucket_client", lambda: (Bucket(), "private-test"))
+    monkeypatch.setattr(repository, "lock_upload", lambda _, upload_id, owner, key: published.get(key))
+    monkeypatch.setattr(repository, "insert_figure", insert)
+    start = "/api/figures/uploads"
+    assert client.post(start, json={"filename": "model.glb", "size": size}).status_code == 401
+    ticket = client.post(start, headers=auth_headers, json={"filename": "model.glb", "size": size}).get_json()
+    body = {"upload_token": ticket["upload_token"], "character_name": "Bowser"}
+    for _ in range(2):
+        response = client.post(f"{start}/finish", headers=auth_headers, json=body)
+        assert response.status_code == 201
+        assert response.get_json() == {"id": 4}
+    assert len(copies) == 1 and copies[0]["Key"].startswith("figures/")
+    assert deletes == [copies[0]["CopySource"]["Key"]]
+
+
+def test_owner_can_attach_generated_thumbnail(client, auth_headers, monkeypatch):
+    calls = []
+
+    class Bucket:
+        def put_object(self, **kwargs):
+            calls.append(kwargs["ContentType"])
+
+    monkeypatch.setattr(storage, "bucket_client", lambda: (Bucket(), "private-test"))
+    monkeypatch.setattr(repository, "add_model_thumbnail", lambda _, figure, owner, asset: (
+        asset[0] == "model_thumbnail" if (figure, owner) == (1, 7) else None
+    ))
+    for figure, status in [(2, 404), (1, 204)]:
+        response = client.put(f"/api/figures/{figure}/thumbnail", headers=auth_headers, data={
+            "thumbnail": (BytesIO(b"\xff\xd8\xff"), "model-preview.jpg"),
+        })
+        assert response.status_code == status
+    assert calls == ["image/jpeg"]
+
+
 def test_upload_requires_sign_in_and_feature_requires_gallery_owner(client, auth_headers, monkeypatch):
     monkeypatch.setenv("CLAY_GALLERY_OWNER_USER_ID", "8")
     assert client.post("/api/figures").status_code == 401

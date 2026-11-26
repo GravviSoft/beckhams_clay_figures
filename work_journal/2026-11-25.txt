@@ -1,0 +1,119 @@
+# AI Used: ChatGPT
+
+- Bowser upload and collection thumbnail diagnosis:
+  - Reason: Verify whether Bowser persisted and explain the cube thumbnail and slow upload.
+  - Investigation: Read the root README end to end, reviewed the November 21 and 24 journal and canonical schema, then checked the live schema, the Bowser row and assets, read-only R2 metadata, API output, logs, and the upload and thumbnail code.
+  - Root cause: Bowser has a display model but no gallery poster. The saved-card renderer uses the cube for figures without a poster, and the temporary model snapshot is not persisted. The upload sends the full payload through the backend before sending it to R2. The logs record completion statuses without a request duration.
+  - Change made: Journal entry only.
+  - Why this approach: Verify the database and storage without altering Bowser or re-uploading the file.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Live schema inspection, read-only SQL lookup, R2 HeadObject, backend log filter, figures API request, and `git diff --check`. No npm commands ran.
+- Results: Bowser is saved as figure ID 1 with a 57,078,996-byte display GLB and no poster. R2 reports the same size. Logs confirm upload 201 and model GET 200.
+- Current blockers or risks: The original upload duration cannot be measured from the available logs.
+- Next steps: An attached gallery photo fills the card. Automatic thumbnails and transfer timing are separate follow-ups.
+
+# AI Used: ChatGPT
+
+- Thumbnail and upload improvement plan:
+  - Reason: Plan a permanent fix for the cube placeholder and wait during large GLB uploads.
+  - Investigation: Based the plan on Bowser's confirmed display-model-only record, current thumbnail capture and relay path, and official R2 browser CORS guidance.
+  - Root cause: Captured previews are temporary and upload completion waits for two sequential transfers.
+  - Change made: Recorded a plan only.
+  - Why this approach: Fix existing card images independently, then change transport with timing evidence and a verified upload completion step.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Prior read-only diagnostics and review of Cloudflare R2 CORS documentation.
+- Results: Plan covers backfill without GLB re-upload, optional photo precedence, direct upload, and reload verification.
+- Current blockers or risks: Direct browser upload requires bucket CORS and a safe staging/finalization flow.
+- Next steps: Implement thumbnail persistence first, then direct upload and end-to-end verification.
+
+# AI Used: ChatGPT
+
+- Persistent thumbnails and direct GLB upload:
+  - Reason: Give Bowser a thumbnail from its saved GLB and avoid relaying future eligible uploads through Flask.
+  - Investigation: Inspected the live schema, model capture and storage paths, and browser-style R2 preflight and CORS policy access.
+  - Root cause: Saved figures had no persistent rendered thumbnail, and browser direct PUT is currently blocked by bucket CORS.
+  - Change made: Added owner-only generated thumbnail storage, automatic capture when an owner opens a figure with no image, and an edit retry. Added signed staging, browser upload progress, verified finalization, and a relay fallback.
+  - Why this approach: Preserve manual photo precedence and keep R2 private. Serialize finalization and copy the verified staged object before adding a public figure.
+- Files touched: Gallery backend, migration and schema composer, frontend, tests, READMEs, and this journal.
+- Database changes or migrations applied: Applied `005_model_thumbnails.sql`; all five migration checksums matched.
+- Tests and verification commands run: Docker backend tests, frontend tests, browser-style CORS preflight, live signed PUT and conditional range/copy probe, cleanup, browser access attempt, route probes, and `git diff --check`.
+- Results: 44 backend tests passed. Signed PUT returned 200 and conditional range read/copy succeeded. Temporary probes were cleaned up and the R2 probe prefix was empty. Browser access was unavailable. The initial frontend suite failed during an unusually slow run. After restarting the frontend, all six focused gallery and upload tests passed. Webpack compiled successfully and gallery and health routes returned 200.
+- Current blockers or risks: Bucket preflight returns 403 and the app token cannot read bucket CORS. A dashboard administrator needs to allow PUT from the exact gallery origins and the Content-Type request header. Bowser's visual thumbnail persistence and browser direct upload timing have not yet been verified.
+- Next steps: Open Bowser as the owner to generate the thumbnail. Configure bucket CORS and staging lifecycle, then time a full browser upload and refresh.
+
+# AI Used: ChatGPT
+
+- Empty gallery after frontend restart:
+  - Reason: Determine whether the empty Collection meant Bowser's saved record disappeared.
+  - Investigation: Checked the live gallery response, read-only figure and asset records, R2 object metadata, the model endpoint, and recent gallery logs.
+  - Root cause: No data loss observed. The exact reason the browser displayed an empty collection was not reproduced.
+  - Change made: Journal entry only.
+  - Why this approach: Verify persistence and delivery independently before changing code or data.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Gallery and asset HTTP probes, read-only SQL, R2 HeadObject, and backend log filtering.
+- Results: Bowser is still figure 1 with its 57,078,996-byte display model. Gallery JSON returns Bowser and the model endpoint returns HTTP 200 with the matching content length. No thumbnail record has been generated yet.
+- Current blockers or risks: If the same browser remains empty after refresh, inspect the exact page URL and its figures response.
+- Next steps: Refresh the configured local gallery. Inspect the browser request if the empty view persists.
+
+# AI Used: ChatGPT
+
+- Bowser deep-link follow-up:
+  - Reason: Check the exact URL supplied after the empty collection report.
+  - Investigation: Checked `/?figure=1`, the live figures response, and the frontend selection code.
+  - Root cause: Not reproduced. The query parameter selects a figure after the collection loads and cannot filter the collection itself.
+  - Change made: Journal entry only.
+  - Why this approach: The direct URL and API are responding before any change is warranted.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Exact URL and gallery API probes, source inspection, and browser access attempt.
+- Results: Exact URL returned HTTP 200. The browser automation host was unavailable.
+- Current blockers or risks: User-browser network behavior remains unverified.
+- Next steps: Try a hard reload, then inspect the browser's figures response if the collection remains empty.
+
+# AI Used: ChatGPT
+
+- Slow Bowser download and model loading feedback:
+  - Reason: Diagnose the persistent model spinner after Bowser's metadata appeared.
+  - Investigation: Measured the full GLB transfer through Traefik in compressed and uncompressed modes, inspected Model Viewer loading and the backend asset route, and observed an HTML fallback response while the backend restarted.
+  - Root cause: The 57 MB asset transferred only 3.6 MB in 30 seconds, even though headers arrived in under two seconds. The prior work targeted uploads. The viewer showed an indeterminate spinner and the gallery parser accepted HTML as an empty result.
+  - Change made: Added eager model loading, progress, stalled-load retry, longer caching for saved models, and explicit API response validation.
+  - Why this approach: Make slow or stalled loads visible and improve repeat visits without modifying the saved asset.
+- Files touched: Gallery viewer JSX and CSS, gallery API and tests, backend asset route, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Timed curl downloads, Docker frontend and backend tests, backend restart/import, routed headers, container inspection, and `git diff --check`.
+- Results: Gallery UI tests and 10 backend route tests passed. Gallery and health responded 200 and the model route reported the correct GLB type, length, and 24-hour cache.
+- Current blockers or risks: First load still transfers the original 57 MB. Browser rendering and thumbnail generation were not reverified.
+- Next steps: Generate a smaller web copy for a meaningful first-load speedup while preserving Bowser's original.
+
+# AI Used: ChatGPT
+
+- Bowser playback and thumbnail QA:
+  - Reason: Diagnose why a saved figure still shows a cube and fails to render.
+  - Investigation: Checked upload and thumbnail flow, live asset records, GLB binary and JSON metadata, direct R2 and routed transfer rates, partial-response behavior, and recent backend logs.
+  - Root cause: Bowser has only the 57 MB display asset. Automatic thumbnails depend on successful owner-side 3D rendering. Transfers are slow both directly from R2 and via the app; the exact browser error was not reproduced, and the generic viewer error does not distinguish transfer and rendering failures.
+  - Change made: Journal entry only.
+  - Why this approach: Isolate the fault without changing or re-uploading Bowser.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Read-only SQL and R2 range reads, timed gallery GET, Range GET, logs, source review, and `git diff --check`.
+- Results: Valid GLB 2 header and JSON length; declared 57,078,996 bytes match DB. About 1,017,775 vertices and 1,966,413 triangles, with a 911,498-byte embedded image. Routed GET delivered about 10.2 MB in 45 seconds. Direct R2 delivered one MiB in 9.54 seconds. The model endpoint ignored a Range request and returned 200 for the full asset. No full transfer or browser decode was verified.
+- Current blockers or risks: No persisted thumbnail exists; cache only helps after a completed download.
+- Next steps: Generate an independent persisted poster and optimized display GLB from the saved original, add measured stage diagnostics, and verify first load and reload in a browser.
+
+# AI Used: ChatGPT
+
+- Durable Bowser display assets:
+  - Reason: Keep a saved image visible even when interactive rendering is slow or fails.
+  - Investigation: Reproduced an interrupted original transfer at about 60 seconds, located the matching local source, rendered an offline JPEG, and generated a lighter textured GLB.
+  - Root cause: The 57 MB original exceeded the observed transfer window and the gallery had no independent static image.
+  - Change made: Attached separate thumbnail and web-model assets to Bowser, made the stage prefer the web model and keep its static image on 3D failure, and made new uploads reuse a successfully captured local thumbnail. Added a repeatable Blender and publishing workflow.
+  - Why this approach: Preserve the original and keep the figure's appearance independent of WebGL and large transfers.
+- Files touched: Gallery backend, migration and schema composer, Blender and publishing scripts, frontend and tests, READMEs, and this journal.
+- Database changes or migrations applied: Applied `006_web_model_asset.sql` and added the web model and thumbnail records to Bowser (figure 1). Original record and object were preserved.
+- Tests and verification commands run: Render and inspect thumbnail, verify original checksum against R2, verify migration ledger, 44 Docker backend tests, 21 Docker frontend tests, full routed asset downloads and byte comparisons, route and container checks, and `git diff --check`.
+- Results: The original is 57,078,996 bytes. The 84,999-face web copy is 3,470,788 bytes and downloaded completely in 17.15 seconds. The 23,210-byte thumbnail downloaded in 2.84 seconds. Both matched local outputs byte for byte. Gallery and health returned HTTP 200.
+- Current blockers or risks: No interactive WebGL browser check was completed. Creating optimized derivatives for other large figures is a documented operator workflow, not a background job.
+- Next steps: Refresh Bowser and verify the static image on the card and stage, followed by interactive rotation.

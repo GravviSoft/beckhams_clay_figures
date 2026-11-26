@@ -18,6 +18,7 @@ export default function AppLayout() {
   const signedIn = Boolean(authToken);
   const [authMode, setAuthMode] = useState(null);
   const [showPasskeySetup, setShowPasskeySetup] = useState(false);
+  const [enrollAfterPassword, setEnrollAfterPassword] = useState(false);
   const [reauthenticating, setReauthenticating] = useState(false);
   const afterSignIn = useRef([]);
   const registering = authMode === 'register';
@@ -33,6 +34,7 @@ export default function AppLayout() {
   function closeSignIn() {
     afterSignIn.current = [];
     setReauthenticating(false);
+    setEnrollAfterPassword(false);
     setAuthMode(null);
   }
 
@@ -72,9 +74,6 @@ export default function AppLayout() {
           {!signedIn && location.pathname !== '/login' && (
             <AppButton variant="text" label="Sign in" onClick={() => setAuthMode('login')} />
           )}
-          {signedIn && supportsPasskeys() && (
-            <AppButton variant="text" icon="pi pi-key" label="Add a passkey" onClick={() => setShowPasskeySetup(true)} />
-          )}
           {signedIn && (
             <AppButton variant="text" icon="pi pi-sign-out" label="Sign out" onClick={() => {
               logout();
@@ -108,7 +107,17 @@ export default function AppLayout() {
           {!registering && supportsPasskeys() && <PasskeySignIn onSuccess={finishSignIn} />}
           <AuthForm key={authMode} submitLabel={registering ? 'Create account' : 'Sign in'}
             passwordAutoComplete={registering ? 'new-password' : 'current-password'}
-            action={registering ? register : login} onSuccess={finishSignIn}
+            action={registering ? register : login} onSuccess={() => {
+              if (!registering && !reauthenticating && enrollAfterPassword) setShowPasskeySetup(true);
+              finishSignIn();
+            }}
+            passkeyOption={!registering && !reauthenticating && supportsPasskeys() && (
+              <label className="auth-form__passkey-option">
+                <input type="checkbox" checked={enrollAfterPassword}
+                  onChange={(event) => setEnrollAfterPassword(event.target.checked)} />
+                Add a passkey after signing in
+              </label>
+            )}
             switchLabel={registering ? 'Back to sign in' : 'Create an account'}
             onSwitch={() => setAuthMode(registering ? 'login' : 'register')} />
         </AppFormDialog>

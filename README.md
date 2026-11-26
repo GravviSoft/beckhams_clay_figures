@@ -313,7 +313,8 @@ Collection panel. Each local GLB gets a model thumbnail and a **⋯ → Delete**
 action. The collection lives in the browser until you leave or reload the
 gallery. It uses a version-pinned Model Viewer module from jsDelivr.
 The public gallery is available signed out. Sign in opens a dialog over the
-gallery. To set up device sign-in, use **Add a passkey** after password sign-in,
+gallery. To set up device sign-in, select **Add a passkey after signing in** in
+the password dialog and follow the setup prompt,
 then select **Sign in with a passkey** on later visits. Passkeys are tied to the
 site hostname. Use the public HTTPS address for phones and enroll on the hostname
 where you plan to sign in. Keep the exact origins in `CORS_ORIGINS`.
@@ -324,13 +325,27 @@ resumes the selected file after sign-in. Every signed-in account can save a GLB 
 PostgreSQL. Accounts can edit their own figures and attach an optional gallery
 photo. The configured gallery owner can star a model they uploaded to pin it
 first and make it the gallery's default view.
-The stage has zoom and reset buttons on desktop and mobile, and a desktop
-orientation widget to snap to the front, right, or top view.
+The desktop stage has zoom and reset buttons and an orientation widget to
+snap to the front, right, or top view. Mobile uses drag and pinch gestures.
 Set `CLAY_GALLERY_OWNER_USER_ID` only if you want to enable the gallery-wide
 featured model action. Set the R2 credentials and bucket from `.env.example`. Use a separate dev
 database and bucket when publishing test figures.
 The GLB upload limit defaults to 250 MB. Set `CLAY_GALLERY_MODEL_MAX_MB` in
 `.env` to adjust it, then recreate the backend container so it reads the change.
+When the owner views a saved model without a gallery photo, the viewer can
+generate and save a small thumbnail. Use **Edit → Generate thumbnail** to retry.
+An uploaded gallery photo takes precedence.
+For large saved models, the gallery prefers a smaller `web_model` derivative
+when available. A saved image remains visible during 3D loading and on failure.
+The uploaded GLB remains the original. See the clay gallery domain guide for
+the offline derivative workflow.
+
+For direct GLB uploads, configure R2 CORS with the exact dev and production
+origins, method `PUT`, and allowed header `Content-Type`. The private bucket
+uses short-lived signed PUT URLs. The API checks the staged model and publishes
+it only after verification. If browser access to R2 fails, the uploader can
+use the existing API relay. Configure an R2 lifecycle rule for the `staging/`
+prefix to expire abandoned uploads.
 
 - Use `components/PageLoader.jsx` for every loading state instead of plain
   text or a new spinner.

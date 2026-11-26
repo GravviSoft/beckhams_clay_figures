@@ -7,7 +7,7 @@ import './AuthForm.css';
 
 export default function AuthForm({
   title, submitLabel, alternateText, alternatePath, alternateLabel, action,
-  onSuccess, passwordAutoComplete = 'current-password', switchLabel, onSwitch,
+  onSuccess, passwordAutoComplete = 'current-password', switchLabel, onSwitch, passkeyOption,
 }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +40,7 @@ export default function AuthForm({
           <AppField label="Password" htmlFor="auth-password">
             <InputText id="auth-password" type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={passwordAutoComplete} required />
           </AppField>
+          {passkeyOption}
         </fieldset>
         {error && <p className="auth-form__error" role="alert">{error}</p>}
         <AppActionGroup align={onSwitch ? 'between' : 'end'}>

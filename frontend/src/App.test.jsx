@@ -1,16 +1,34 @@
 import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
-import { saveFigure } from './domains/clay_gallery/galleryApi';
+import { listFigures, saveFigure } from './domains/clay_gallery/galleryApi';
 import { UnauthorizedError } from './services/api';
 import { clearAuthSession, getAuthToken } from './services/auth';
 
 jest.mock('./domains/clay_gallery/galleryApi', () => ({
-  listFigures: async () => [],
+  listFigures: jest.fn(),
   getAuthoring: async () => ({ can_upload: true, can_feature: false, editable_figure_ids: [] }),
   saveFigure: jest.fn(),
   figureAssetUrl: (id, type) => `/api/figures/${id}/assets/${type}`,
 }));
+
+beforeEach(() => {
+  listFigures.mockResolvedValue([]);
+});
+
+test('a saved figure shows its thumbnail while the 3D viewer is unavailable', async () => {
+  window.localStorage.clear();
+  listFigures.mockResolvedValue([{
+    id: 1, character_name: 'Bowser', assets: [
+      { asset_type: 'display_model' }, { asset_type: 'web_model' }, { asset_type: 'model_thumbnail' },
+    ],
+  }]);
+  render(<MemoryRouter initialEntries={['/?figure=1']}><App /></MemoryRouter>);
+  expect(await screen.findByRole('img', { name: 'Bowser' })).toHaveAttribute(
+    'src', '/api/figures/1/assets/model_thumbnail?v=',
+  );
+  expect(screen.getByRole('button', { name: 'Bowser' })).toBeInTheDocument();
+});
 
 test('signed-out visitors see the public gallery', async () => {
   window.localStorage.clear();
@@ -81,6 +99,8 @@ test('picking a signed-in model submits it immediately without a photo', async (
     expect(form.has('poster')).toBe(false);
     await waitForElementToBeRemoved(() => screen.queryByText('Saving…'));
     expect(screen.getByRole('button', { name: 'Clay Bowser', pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Feature model: Clay Bowser' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Clay Bowser' }));
     expect(screen.getByRole('button', { name: 'Edit Clay Bowser' })).toBeInTheDocument();
     unmount();
   } finally {
@@ -119,6 +139,8 @@ test('an expired upload opens sign-in and resumes with the same GLB', async () =
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(saveFigure).toHaveBeenCalledTimes(2));
     expect(saveFigure.mock.calls[1][0].get('model')).toBe(file);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Feature model: Bowser' })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Options for Bowser' }));
     expect(await screen.findByRole('button', { name: 'Edit Bowser' })).toBeInTheDocument();
     unmount();
   } finally {

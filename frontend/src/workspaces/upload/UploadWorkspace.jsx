@@ -7,9 +7,22 @@ import { saveFigure, updateFigure } from '../../domains/clay_gallery/galleryApi'
 import { isUnauthorizedError, UnauthorizedError } from '../../services/api';
 import { getAuthToken } from '../../services/auth';
 
-export default function UploadWorkspace({ figure, signedIn, persisted = false, onClose, onEdit, onSaved, onReauthenticate }) {
+export default function UploadWorkspace({ figure, signedIn, persisted = false, onClose, onEdit, onSaved, onReauthenticate, onGenerateThumbnail }) {
   const [busy, setBusy] = useState(false);
+  const [capturing, setCapturing] = useState(false);
   const [error, setError] = useState('');
+
+  async function generateThumbnail() {
+    setError('');
+    setCapturing(true);
+    try {
+      await onGenerateThumbnail();
+    } catch (err) {
+      setError(err.message || 'Could not generate a thumbnail.');
+    } finally {
+      setCapturing(false);
+    }
+  }
 
   function submit(event) {
     event.preventDefault();
@@ -78,6 +91,8 @@ export default function UploadWorkspace({ figure, signedIn, persisted = false, o
               <input id="figure-poster" name="poster" type="file" accept="image/png,image/jpeg" />
               {figure.poster && <small>Current photo: {figure.poster.name}</small>}
             </AppField>
+            {onGenerateThumbnail && <AppButton type="button" variant="text" label="Generate thumbnail"
+              icon="pi pi-image" onClick={generateThumbnail} loading={capturing} disabled={capturing} />}
           </fieldset>
           {error && <div role="alert"><StatusState type="error" title="Figure could not be saved" message={error} /></div>}
           <AppActionGroup>

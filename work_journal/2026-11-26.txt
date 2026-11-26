@@ -1,0 +1,58 @@
+# AI Used: ChatGPT
+
+- Restore saved figure card controls:
+  - Reason: Keep saved cards consistent with the earlier thumbnail layout.
+  - Investigation: Checked the local and saved card branches and the feature permission check.
+  - Root cause: Saved cards rendered a pencil shortcut and hid the feature star for owners without global feature permission.
+  - Change made: Restored the bottom-right ellipsis and top-right star for editable saved cards. The menu opens Edit.
+  - Why this approach: Keep the image sizing and server authorization while restoring consistent controls.
+- Files touched: Gallery JSX, frontend app tests, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Dockerized app tests and `git diff --check`.
+- Results: Whitespace check passed. Initial test runs clicked a transient upload card; the latest test waits for the saved card. Verification stalled while the local gallery route timed out.
+- Current blockers or risks: Browser appearance and the final Docker test result were not verified.
+- Important implementation decisions: Feature permission remains server-controlled.
+
+# AI Used: ChatGPT
+
+- Compact mobile figure heading:
+  - Reason: Put the date next to the name and remove mobile gesture instructions.
+  - Investigation: Reviewed figure heading markup and the existing mobile breakpoint.
+  - Root cause: The date and gesture hint each occupied their own row on mobile.
+  - Change made: Grouped title and date, gave the mobile date more contrast and weight, and hid the gesture hint at mobile widths.
+  - Why this approach: Keeps the heading compact while retaining zoom controls and permitting long titles to wrap.
+- Files touched: Gallery JSX and CSS, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed. Mobile appearance was not visually verified.
+- Current blockers or risks: None for the layout change.
+- Important implementation decisions: Keep desktop layout and mobile zoom controls.
+
+# AI Used: ChatGPT
+
+- Hide mobile toolbar and align dates on all widths:
+  - Reason: Follow the clarified mobile toolbar and desktop date requirements.
+  - Investigation: Checked the camera gutter, toolbar, and heading breakpoints.
+  - Root cause: The previous CSS hid the gesture text only and limited the date layout to mobile.
+  - Change made: Hide the toolbar and remove its gutter on mobile. Share the inline date styling across screen sizes.
+  - Why this approach: Mobile retains gestures and gains model space, while desktop keeps its camera controls.
+- Files touched: Gallery CSS, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed; visual browser verification was not performed.
+- Current blockers or risks: None identified for the CSS change.
+- Important implementation decisions: Hide camera buttons on narrow or coarse-pointer screens.
+
+# AI Used: ChatGPT
+
+- Mobile-only gesture hint:
+  - Reason: Keep the hint small and below the model on mobile.
+  - Investigation: Reviewed the stage grid, viewport, and mobile camera breakpoint.
+  - Root cause: The hint was in the header and visible on desktop.
+  - Change made: Moved the hint below the viewport and styled it as small muted text for mobile and touch layouts.
+  - Why this approach: A separate row prevents overlap with the model.
+- Files touched: Gallery JSX and CSS, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check`.
+- Results: Whitespace check passed. Browser layout was not visually verified.
+- Current blockers or risks: None identified.

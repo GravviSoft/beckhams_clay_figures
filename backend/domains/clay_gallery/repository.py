@@ -73,6 +73,54 @@ def find_display_asset(connection, figure_id, asset_type):
         return cursor.fetchone()
 
 
+def lock_upload(connection, upload_id, owner_id, final_key):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (upload_id,))
+        cursor.execute(
+            """SELECT f.id FROM figures f JOIN assets a ON a.figure_id = f.id
+               WHERE f.owner_user_id = %s AND a.storage_key = %s""",
+            (owner_id, final_key),
+        )
+        return cursor.fetchone()
+
+
+def add_model_thumbnail(connection, figure_id, owner_id, asset):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT id FROM figures WHERE id = %s AND owner_user_id = %s FOR UPDATE""",
+            (figure_id, owner_id),
+        )
+        if not cursor.fetchone():
+            return None
+        cursor.execute(
+            """INSERT INTO assets (figure_id, asset_type, storage_key, original_filename, content_type, size_bytes)
+               VALUES (%s, %s, %s, %s, %s, %s)
+               ON CONFLICT (figure_id, asset_type) DO NOTHING RETURNING id""",
+            (figure_id, *asset),
+        )
+        return cursor.fetchone() is not None
+
+
+def add_web_derivatives(connection, figure_id, assets):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id FROM figures WHERE id = %s FOR UPDATE", (figure_id,))
+        if not cursor.fetchone():
+            return []
+        inserted = []
+        for asset in assets:
+            cursor.execute(
+                """INSERT INTO assets (figure_id, asset_type, storage_key, original_filename,
+                                       content_type, size_bytes)
+                   VALUES (%s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (figure_id, asset_type) DO NOTHING RETURNING asset_type""",
+                (figure_id, *asset),
+            )
+            row = cursor.fetchone()
+            if row:
+                inserted.append(row["asset_type"])
+        return inserted
+
+
 def update_figure(connection, figure_id, owner_id, details, poster):
     with connection.cursor() as cursor:
         cursor.execute(
