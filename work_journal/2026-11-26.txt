@@ -285,3 +285,16 @@
 - Current blockers or risks: Desktop and mobile browser validation remains open. Production requires project-specific metadata, strong signing credentials, and deliberate database separation.
 - Build verification: The production frontend compiled in Docker under an isolated Compose project. The normal development stack retained only its frontend and backend, and the build project had no containers.
 - Boilerplate follow-up: Make inherited project values explicit, guard production signing secrets and development database selection, and make public registration a product setting. Keep media delivery as a clay-gallery concern.
+
+# AI Used: ChatGPT
+
+- Production mobile loading options:
+  - Reason: Reported phone load exceeded 10 seconds.
+  - Investigation: Timed parallel public requests for HTML, gallery JSON, Bowser thumbnail, optimized GLB, and viewer script. Reviewed the frontend dependency chain, the API-to-R2 delivery path, the existing publishing workflow, and Cloudflare and model-viewer documentation.
+  - Root cause: The page discovers the chosen assets after gallery JSON arrives. The asset API reads PostgreSQL and streams R2 bytes through the VPS. The optimized GLB remains large enough to dominate cold load. Mobile decode and rendering were not measured.
+  - Change made: Journal entry only.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Five public GETs with curl timing and response headers, repository review, and git diff --check.
+- Results: HTML 2.08 seconds, gallery JSON 2.97 seconds, 23 KB thumbnail 3.66 seconds, optimized GLB 14.65 seconds with 3.24 seconds to first byte and 3.32 MB transferred, and viewer module 2.30 seconds. These are individual timings from this connection, not a measured phone waterfall.
+- Next steps: Pilot a purpose-rendered stage still and versioned CDN delivery, benchmark a compact GLB on a real phone, and measure time to first figure and time to rotation separately.
