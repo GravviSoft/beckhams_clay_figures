@@ -56,3 +56,16 @@
 - Tests and verification commands run: `git diff --check`.
 - Results: Whitespace check passed. Browser layout was not visually verified.
 - Current blockers or risks: None identified.
+
+# AI Used: ChatGPT
+
+- Move passkey setup out of navigation:
+  - Reason: Keep the header compact and offer enrollment only in the sign-in form.
+  - Investigation: Traced the persistent header action into the existing passkey setup dialog.
+  - Root cause: The setup action was rendered for every signed-in session.
+  - Change made: Removed the header action and added an opt-in to password sign-in that opens the existing setup dialog.
+  - Why this approach: Enrollment stays available when explicitly chosen and ordinary sign-in keeps its existing behavior.
+- Files touched: App layout, auth form and styles, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: `git diff --check` and Docker sign-in and passkey tests.
+- Current blockers or risks: Browser appearance was not visually verified.
