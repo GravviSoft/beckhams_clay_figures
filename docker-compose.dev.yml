@@ -1,5 +1,5 @@
 # Development stack. Joins the already-running shared Traefik on the external
-# proxy network and routes only DEV_APP_DOMAIN (becksclayfigures.localhost). It binds
+# proxy network and routes only DEV_APP_DOMAIN (becksclay.localhost). It binds
 # no host ports and adds no bare `localhost` router, so it runs beside other
 # local apps on the same Traefik without colliding.
 services:
@@ -28,7 +28,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclayfigures.localhost}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclay.localhost}`) && PathPrefix(`/api`)
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.priority=100
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api-dev.service=${APP_SLUG:-becks-clay-figures}-api-dev
@@ -64,7 +64,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclayfigures.localhost}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.rule=Host(`${DEV_APP_DOMAIN:-becksclay.localhost}`)
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.entrypoints=${TRAEFIK_DEV_ENTRYPOINT:-web}
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.priority=10
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.service=${APP_SLUG:-becks-clay-figures}-web-dev

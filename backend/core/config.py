@@ -19,5 +19,5 @@ class Config:
     DB_SCHEMA = os.getenv("DB_SCHEMA", "").strip()
     CORS_ORIGINS = _csv(
         "CORS_ORIGINS",
-        "https://becksclayfigures.gravvisoft.com,http://becksclayfigures.localhost",
+        "https://becksclay.gravvisoft.com,http://becksclay.localhost",
     )

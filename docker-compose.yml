@@ -16,7 +16,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.rule=Host(`${APP_DOMAIN:-becksclayfigures.gravvisoft.com}`) && PathPrefix(`/api`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.rule=Host(`${APP_DOMAIN:-becksclay.gravvisoft.com}`) && PathPrefix(`/api`)
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.tls=true
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
@@ -40,7 +40,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=${TRAEFIK_NETWORK:-proxy-net}
-      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.rule=Host(`${APP_DOMAIN:-becksclayfigures.gravvisoft.com}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.rule=Host(`${APP_DOMAIN:-becksclay.gravvisoft.com}`)
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.tls=true
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}

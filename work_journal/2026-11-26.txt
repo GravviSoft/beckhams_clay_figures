@@ -69,3 +69,147 @@
 - Database changes or migrations applied: None.
 - Tests and verification commands run: `git diff --check` and Docker sign-in and passkey tests.
 - Current blockers or risks: Browser appearance was not visually verified.
+
+# AI Used: ChatGPT
+
+- Production frontend 404 diagnosis:
+  - Reason: Identify why the server deployment returns 404.
+  - Investigation: Compared production Compose routing and Nginx with public DNS and HTTPS responses.
+  - Root cause: The correct hostname serves Gunicorn health but its root returns a plain-text 404. The frontend route is the primary suspect. Exact server container state and router labels were not available.
+  - Change made: Journal entry only.
+  - Why this approach: Isolate the frontend route before changing server configuration.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Public DNS and HTTPS probes, production Compose and Nginx review.
+- Results: Correct hostname resolves and health returns HTTP 200 while root returns HTTP 404. README production hostname differs from the configured hostname.
+- Current blockers or risks: Need production Compose status and frontend logs to determine whether the frontend is missing, stopped, or misrouted.
+
+# AI Used: ChatGPT
+
+- R2 credential rotation guidance:
+  - Reason: Replace the R2 credential pair for Beck's Clay.
+  - Investigation: Checked README, recent journal notes, schema, the storage adapter, the Compose environment wiring, and the Cloudflare dashboard instructions.
+  - Root cause: The prior key pair was shared in troubleshooting context and should be replaced if still active.
+  - Change made: Recorded the procedure only. Use a new Object Read & Write token scoped to the existing becks-clay bucket.
+  - Why this approach: Preserve saved models, thumbnails, and bucket settings while limiting the new credential's scope.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Read-only configuration review and git diff --check.
+- Results: Confirmed which .env keys the backend reads. Credential rotation and live storage verification are pending.
+- Current blockers or risks: Verify which deployments use the old token before revoking it.
+- Prevent next time: Use a bucket-scoped token and keep its credentials in the deployment environment.
+- Important implementation decisions: Recreate only the backend after updating both credential values. Verify an existing model and a fresh upload before revocation.
+
+# AI Used: ChatGPT
+
+- Standardize Beck's Clay hostnames:
+  - Reason: Use the shorter hostnames consistently in production and local development.
+  - Investigation: Reviewed the README, recent journal entries, schema snapshot, repository hostname references, and hostname variables in both environment files.
+  - Root cause: Some defaults and published metadata still used the longer hostname while both environment files already used the shorter one. The source of the live 404 remains unconfirmed.
+  - Change made: Aligned the Compose router defaults, Flask CORS defaults, canonical and social URLs, and README with the active hostnames.
+  - Why this approach: Keep routing, allowed origins, and public metadata consistent with the chosen domains.
+- Files touched: README.md, docker-compose.yml, docker-compose.dev.yml, backend/core/config.py, frontend/public/index.html, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Production and development Compose config rendering, repository hostname search, and git diff --check.
+- Results: Both Compose configs render the expected frontend and API hostname rules. The retired hostname is absent from the repository search.
+- Current blockers or risks: The VPS still needs the updated files and recreated containers. Live router registration remains unverified.
+
+# AI Used: ChatGPT
+
+- Shared Traefik routing diagnosis for the boilerplate:
+  - Reason: Capture a repeatable diagnosis for future deployments on the shared VPS.
+  - Investigation: Reviewed production Compose and operator output for direct NGINX, public HTTPS, live labels, and filtered Traefik logs.
+  - Root cause: Unconfirmed. NGINX returned 200 internally, public / returned a plain-text 404, and public /api/health returned 200. Both containers had the correct hostname, websecure entrypoint, and proxy-net network. The filtered Traefik log output was empty.
+  - Change made: Journal entry only.
+  - Why this approach: Establish which layer returns the 404 before modifying shared infrastructure or adding a boilerplate fix.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Operator ran internal wget, public curl, Docker label inspection, and filtered Traefik logs.
+- Results: The retired hostname was not in the running app labels when inspected.
+- Current blockers or risks: Need direct VPS HTTPS and router-collision checks. If the direct request also fails, inspect active Traefik routers using existing private access where available.
+- Prevent next time: Capture the verified cause and the corresponding boilerplate preflight once the issue is reproduced and resolved.
+
+# AI Used: ChatGPT
+
+- VPS-local routing check:
+  - Reason: Distinguish public DNS or edge routing from the VPS listener and check for an exact duplicate Docker router label.
+  - Investigation: Operator forced HTTPS to 127.0.0.1 with the production hostname and searched running containers for the frontend router label.
+  - Root cause: Still unconfirmed.
+  - Change made: Journal entry only.
+  - Why this approach: Narrow the issue without restarting the shared proxy.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Operator ran curl --resolve and docker ps with a router label filter. Ran git diff --check.
+- Results: VPS-local frontend returned 404. The exact Docker router label matched only becks-clay-frontend-1 in project becks-clay.
+- Current blockers or risks: Active Traefik configuration remains unverified. Compare VPS-local API and frontend results and query the router API if already privately available.
+- Prevent next time: Preserve the distinction between Docker labels and routers actually loaded by Traefik.
+
+# AI Used: ChatGPT
+
+- Confirm both routes on the VPS HTTPS listener:
+  - Reason: Isolate the frontend routing failure on the shared proxy.
+  - Investigation: Compared VPS-local / and /api/health using the same hostname and tested the private Traefik API address.
+  - Root cause: Unconfirmed.
+  - Change made: Journal entry only.
+  - Why this approach: Diagnose the frontend route without exposing an admin listener or restarting the proxy.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Operator ran curl --resolve and an in-container wget to port 8080. Ran git diff --check.
+- Results: VPS-local API returned 200 and frontend returned 404. The container-local port 8080 refused the connection.
+- Current blockers or risks: Check Docker provider filters and log destination. If needed, recreate only the frontend and compare both routes again.
+- Prevent next time: Use both public routes as separate deployment checks.
+
+# AI Used: ChatGPT
+
+- Frontend-only recreation check:
+  - Reason: Trigger a fresh Docker event for the missing frontend route.
+  - Investigation: Operator recreated the production frontend without rebuilding or restarting dependencies.
+  - Root cause: Unconfirmed.
+  - Change made: Recreated the VPS frontend container. Repository change limited to this journal.
+  - Why this approach: Limit disruption to the affected service.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Operator ran Compose up with force recreation, a VPS-local HTTPS probe, and a five-minute Traefik log tail. Ran git diff --check.
+- Results: Compose recreated the frontend. The immediate probe returned 404 and the log tail was empty.
+- Current blockers or risks: A delayed probe is pending. If it still fails, inspect the shared proxy's provider settings, mounted configuration, and log destination.
+
+# AI Used: ChatGPT
+
+- Delayed frontend route verification:
+  - Reason: Allow time for Traefik to process the frontend container event.
+  - Investigation: Operator repeated the VPS-local HTTPS request after the container had settled.
+  - Root cause: Unconfirmed.
+  - Change made: Journal entry only.
+  - Why this approach: Verify the outcome of recreation before changing the shared proxy.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Operator repeated curl --resolve for the homepage.
+- Results: Delayed probe still returned 404.
+- Current blockers or risks: Need proxy arguments and config mount locations to locate the provider rules and log destination.
+
+# AI Used: ChatGPT
+
+- Check the production frontend health probe:
+  - Reason: Explain why the router can be missing even when NGINX answers internally.
+  - Investigation: Operator found Docker opt-in mode. The frontend already has traefik.enable=true. Reviewed frontend/Dockerfile and Traefik v3.0 Docker provider source.
+  - Root cause: Pending Docker health output. The image probe uses wget with --tries=1 and localhost. Traefik can omit unhealthy containers and log the exclusion only at debug level.
+  - Change made: Journal entry only.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Read-only configuration and source review, and git diff --check.
+- Current blockers or risks: Need health status and recent probe output from the VPS.
+- Prevent next time: Check Compose container health before debugging the shared proxy when direct NGINX responds and its public route is missing.
+
+# AI Used: ChatGPT
+
+- Fix the frontend health probe in the boilerplate:
+  - Reason: Restore Traefik discovery of the production frontend.
+  - Investigation: VPS Docker inspection reported unhealthy with repeated connection refusals. A manual GET to 127.0.0.1:80 inside that frontend returned 200. Traefik v3.0 excludes unhealthy Docker containers by default.
+  - Root cause: The image probe targeted localhost, while the verified working listener was on IPv4 loopback. The exact localhost resolution order on the VPS was not measured.
+  - Change made: Use a regular wget GET to 127.0.0.1:80 in the production image health check. Document the diagnostic in README.
+  - Why this approach: Match the working probe and preserve Docker health checks without changing the shared proxy.
+- Files touched: frontend/Dockerfile, README.md, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Reviewed VPS health logs and direct HTTP probe. Ran git diff --check.
+- Results: Old probe failure confirmed. The rebuilt image and public route still need VPS verification.
+- Prevent next time: Check frontend container health when the API works and Traefik returns 404 for the homepage.
