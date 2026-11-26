@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutletContext, useSearchParams } from 'react-router-dom';
 import UploadWorkspace from '../../workspaces/upload/UploadWorkspace';
-import PageLoader from '../../components/PageLoader';
 import StatusState from '../../components/StatusState';
 import { isUnauthorizedError, UnauthorizedError } from '../../services/api';
 import { getAuthToken } from '../../services/auth';
@@ -19,6 +18,7 @@ function loadViewer() {
     viewerReady = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.type = 'module';
+      script.crossOrigin = 'anonymous';
       script.src = viewerModule;
       script.onload = () => {
         if (customElements.get('model-viewer')) resolve();
@@ -35,6 +35,16 @@ function loadViewer() {
     });
   }
   return viewerReady;
+}
+
+function StageProgress({ label, progress = null }) {
+  const message = progress === 100 ? 'Preparing model…' : `${label}…`;
+  return (
+    <div className="clay-stage__loading">
+      <p>{message}{progress !== null && ` ${progress}%`}</p>
+      <progress aria-label={label} max={100} value={progress ?? undefined} />
+    </div>
+  );
 }
 
 function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }) {
@@ -57,15 +67,16 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
 
   useEffect(() => {
     const element = viewerRef.current;
-    if (!url || !element) return undefined;
+    if (!url || !element || loaded || error) return undefined;
     const reportProgress = ({ detail }) => {
       if (Number.isFinite(detail?.totalProgress)) {
-        setProgress(Math.min(100, Math.max(0, Math.floor(detail.totalProgress * 100))));
+        const percent = Math.min(100, Math.max(0, Math.floor(detail.totalProgress * 100)));
+        setProgress((previous) => Math.max(previous ?? 0, percent));
       }
     };
     element.addEventListener('progress', reportProgress);
     return () => element.removeEventListener('progress', reportProgress);
-  }, [url]);
+  }, [url, loaded, error]);
 
   useEffect(() => {
     const element = viewerRef.current;
@@ -83,6 +94,15 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
       retryUrl.searchParams.set('retry', String(attempt));
       objectUrl = retryUrl.href;
     }
+    const preload = !file && !attempt && !customElements.get('model-viewer')
+      ? document.createElement('link') : null;
+    if (preload) {
+      preload.rel = 'preload';
+      preload.setAttribute('as', 'fetch');
+      preload.crossOrigin = 'anonymous';
+      preload.href = objectUrl;
+      document.head.append(preload);
+    }
     loadViewer().then(() => {
       if (active) setUrl(objectUrl);
     }).catch(() => {
@@ -90,11 +110,12 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
     });
     return () => {
       active = false;
+      preload?.remove();
       if (file) URL.revokeObjectURL(objectUrl);
     };
   }, [file, source, attempt]);
 
-  function bindViewer(element) {
+  const bindViewer = useCallback((element) => {
     viewerRef.current = element;
     if (!element) return;
     element.onload = () => {
@@ -117,7 +138,7 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
       }
     };
     element.onerror = () => setError('Try another GLB and check that your browser supports WebGL.');
-  }
+  }, [captureThumbnail, onReady]);
 
   function setCameraGoal(element, attribute, value) {
     // A distinct attribute string reapplies the same goal after manual orbit or zoom.
@@ -153,26 +174,11 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
   return (
     <>
       <div className="clay-model-viewport">
-        {!loaded && poster && <img className="clay-stage__poster" src={poster} alt={title} />}
         {url && (
           <model-viewer ref={bindViewer} src={url} alt={title || file?.name}
             loading="eager" camera-controls touch-action="pan-y" min-field-of-view="15deg" shadow-intensity="0.8" />
         )}
-        {!loaded && (
-          <div className={poster ? 'clay-stage__loading clay-stage__loading--with-poster' : 'clay-stage__loading'}>
-            {progress > 0 && progress < 100 ? (
-              <>
-                <p>Loading model… {progress}%</p>
-                <progress aria-label="Loading 3D preview" max="100" value={progress} />
-              </>
-            ) : (
-              <>
-                <PageLoader compact label="Loading 3D preview" />
-                <p>{progress === 100 ? 'Preparing model…' : 'Loading model…'}</p>
-              </>
-            )}
-          </div>
-        )}
+        {!loaded && <StageProgress label="Loading model" progress={progress} />}
       </div>
       {loaded && orbit && <ViewerControls orbit={orbit}
         onZoom={(step) => viewerRef.current.zoom(step)} onReset={resetView} onAxis={alignAxis} />}
@@ -412,6 +418,10 @@ export default function ClayGalleryPage() {
               <ModelPreview key={`saved-${figure.id}-${modelAsset.asset_type}`} title={figure.character_name}
                 source={figureAssetUrl(figure.id, modelAsset.asset_type)} poster={stagePoster}
                 onReady={(element) => setThumbnailViewer({ id: figure.id, element })} />
+            ) : figures === null && !error ? (
+              <div className="clay-model-viewport">
+                <StageProgress label="Loading clay figure gallery" />
+              </div>
             ) : stagePoster ? (
               <img className="clay-stage__fallback" src={stagePoster} alt={figure.character_name} />
             ) : (
@@ -451,7 +461,6 @@ export default function ClayGalleryPage() {
         {fileError && <p role="alert">{fileError}</p>}
         {error && <StatusState type="error" title="The gallery could not load" message={error} />}
         {featureError && <p role="alert">{featureError}</p>}
-        {!error && figures === null && <PageLoader compact label="Loading clay figure gallery" />}
         <div className="clay-rail__grid">
           {previews.map((draft) => {
             const { id, name, thumbnail, saving, saveError, needsSignIn, progress } = draft;
@@ -535,7 +544,8 @@ export default function ClayGalleryPage() {
               }}>
               <span className="clay-preview-card__image">
                 {thumbnailType
-                  ? <img className="clay-saved-poster" src={`${figureAssetUrl(item.id, thumbnailType)}?v=${encodeURIComponent(item.updated_at ?? '')}`} alt="" loading="lazy" />
+                  ? <img className="clay-saved-poster" src={`${figureAssetUrl(item.id, thumbnailType)}?v=${encodeURIComponent(item.updated_at ?? '')}`}
+                    alt="" loading={item.id === figure?.id ? 'eager' : 'lazy'} />
                   : <i className="pi pi-box" aria-hidden="true" />}
               </span>
               <span className="clay-preview-card__name" title={item.character_name}>{item.character_name}</span>

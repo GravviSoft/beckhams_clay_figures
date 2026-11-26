@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { listFigures, saveFigure } from './domains/clay_gallery/galleryApi';
@@ -16,7 +16,7 @@ beforeEach(() => {
   listFigures.mockResolvedValue([]);
 });
 
-test('a saved figure shows its thumbnail while the 3D viewer is unavailable', async () => {
+test('a saved figure shows its thumbnail in the card and uses it on viewer failure', async () => {
   window.localStorage.clear();
   listFigures.mockResolvedValue([{
     id: 1, character_name: 'Bowser', assets: [
@@ -24,10 +24,47 @@ test('a saved figure shows its thumbnail while the 3D viewer is unavailable', as
     ],
   }]);
   render(<MemoryRouter initialEntries={['/?figure=1']}><App /></MemoryRouter>);
+  expect(screen.getByRole('progressbar', { name: 'Loading clay figure gallery' })).not.toHaveAttribute('value');
+  await act(async () => { await listFigures.mock.results[0].value; });
+  const bar = screen.getByRole('progressbar', { name: 'Loading model' });
+  expect(bar).not.toHaveAttribute('value');
+  expect(screen.queryByRole('img', { name: 'Bowser' })).not.toBeInTheDocument();
+  const card = screen.getByRole('button', { name: 'Bowser' });
+  expect(card.querySelector('img')).toHaveAttribute('loading', 'eager');
+  await waitFor(() => expect(document.head.querySelector('link[as="fetch"]')).toHaveAttribute(
+    'href', '/api/figures/1/assets/web_model',
+  ));
+  const viewerDefinition = jest.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
+  fireEvent.load(document.head.querySelector('script[type="module"]'));
+  viewerDefinition.mockRestore();
+  const viewer = await waitFor(() => {
+    const element = document.querySelector('model-viewer');
+    expect(element).toBeInTheDocument();
+    return element;
+  });
+  fireEvent(viewer, new CustomEvent('progress', { detail: { totalProgress: 0.45 } }));
+  expect(bar).toHaveAttribute('value', '45');
+  fireEvent(viewer, new CustomEvent('progress', { detail: { totalProgress: 0.2 } }));
+  fireEvent(viewer, new CustomEvent('progress', { detail: { totalProgress: NaN } }));
+  expect(bar).toHaveAttribute('value', '45');
+  fireEvent(viewer, new CustomEvent('progress', { detail: { totalProgress: 1 } }));
+  expect(bar).toHaveAttribute('value', '100');
+  expect(screen.getByText('Preparing model… 100%')).toBeInTheDocument();
+  fireEvent.error(viewer);
   expect(await screen.findByRole('img', { name: 'Bowser' })).toHaveAttribute(
     'src', '/api/figures/1/assets/model_thumbnail?v=',
   );
-  expect(screen.getByRole('button', { name: 'Bowser' })).toBeInTheDocument();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry model' })); });
+  expect(screen.getByRole('progressbar', { name: 'Loading model' })).not.toHaveAttribute('value');
+  const retriedViewer = document.querySelector('model-viewer');
+  expect(retriedViewer).toHaveAttribute('src', expect.stringContaining('web_model?retry=1'));
+  expect(retriedViewer).not.toBe(viewer);
+  retriedViewer.getCameraOrbit = () => ({ theta: 0, phi: 0, radius: 1, toString: () => '0deg 0deg 1m' });
+  retriedViewer.getCameraTarget = () => ({ x: 0, y: 0, z: 0 });
+  retriedViewer.getFieldOfView = () => 30;
+  fireEvent.load(retriedViewer);
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'Bowser' })).not.toBeInTheDocument();
 });
 
 test('signed-out visitors see the public gallery', async () => {
@@ -36,7 +73,7 @@ test('signed-out visitors see the public gallery', async () => {
   expect(screen.getByRole('heading', { name: /clay collection/i })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /upload/i })).not.toBeInTheDocument();
-  await waitForElementToBeRemoved(() => screen.queryByRole('status', { name: /loading clay figure gallery/i }));
+  await waitForElementToBeRemoved(() => screen.queryByRole('progressbar', { name: /loading clay figure gallery/i }));
   expect(screen.queryByText(/first clay figure/i)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
   expect(await screen.findByRole('dialog', { name: /sign in/i })).toBeInTheDocument();
@@ -57,7 +94,7 @@ test('signed-in visitors can pick a GLB and edit it from its card', async () => 
   URL.revokeObjectURL = () => {};
   try {
     const { unmount } = render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
-    await waitForElementToBeRemoved(() => screen.queryByRole('status', { name: /loading clay figure gallery/i }));
+    await waitForElementToBeRemoved(() => screen.queryByRole('progressbar', { name: /loading clay figure gallery/i }));
     const picker = screen.getByLabelText('Choose a GLB model');
     const openPicker = jest.spyOn(picker, 'click');
     fireEvent.click(screen.getByRole('button', { name: 'Upload a figure' }));
@@ -90,7 +127,7 @@ test('picking a signed-in model submits it immediately without a photo', async (
   URL.revokeObjectURL = () => {};
   try {
     const { unmount } = render(<MemoryRouter><App /></MemoryRouter>);
-    await waitForElementToBeRemoved(() => screen.queryByRole('status', { name: /loading clay figure gallery/i }));
+    await waitForElementToBeRemoved(() => screen.queryByRole('progressbar', { name: /loading clay figure gallery/i }));
     const file = new File(['model'], 'Clay_Bowser.glb');
     fireEvent.change(screen.getByLabelText('Choose a GLB model'), { target: { files: [file] } });
     const [form] = saveFigure.mock.calls[0];
@@ -129,7 +166,7 @@ test('an expired upload opens sign-in and resumes with the same GLB', async () =
   });
   try {
     const { unmount } = render(<MemoryRouter><App /></MemoryRouter>);
-    await waitForElementToBeRemoved(() => screen.queryByRole('status', { name: /loading clay figure gallery/i }));
+    await waitForElementToBeRemoved(() => screen.queryByRole('progressbar', { name: /loading clay figure gallery/i }));
     const file = new File(['model'], 'Bowser.glb');
     fireEvent.change(screen.getByLabelText('Choose a GLB model'), { target: { files: [file] } });
     const dialog = await screen.findByRole('dialog', { name: 'Sign in' });

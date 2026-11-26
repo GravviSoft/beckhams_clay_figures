@@ -336,7 +336,8 @@ When the owner views a saved model without a gallery photo, the viewer can
 generate and save a small thumbnail. Use **Edit → Generate thumbnail** to retry.
 An uploaded gallery photo takes precedence.
 For large saved models, the gallery prefers a smaller `web_model` derivative
-when available. A saved image remains visible during 3D loading and on failure.
+when available. The stage shows a progress bar over the gallery background.
+The saved image appears in the collection and as a fallback if the 3D viewer fails.
 The uploaded GLB remains the original. See the clay gallery domain guide for
 the offline derivative workflow.
 
@@ -347,8 +348,8 @@ it only after verification. If browser access to R2 fails, the uploader can
 use the existing API relay. Configure an R2 lifecycle rule for the `staging/`
 prefix to expire abandoned uploads.
 
-- Use `components/PageLoader.jsx` for every loading state instead of plain
-  text or a new spinner.
+- Use `components/PageLoader.jsx` for general loading states. The gallery stage
+  uses a progress bar that shows measured model progress when available.
 - Use the default loader for full-page waits and `compact` for cards, tables,
   charts, and panels.
 - Give every loader a specific accessible `label` (for example `Loading example items`).

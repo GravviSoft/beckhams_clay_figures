@@ -213,3 +213,75 @@
 - Tests and verification commands run: Reviewed VPS health logs and direct HTTP probe. Ran git diff --check.
 - Results: Old probe failure confirmed. The rebuilt image and public route still need VPS verification.
 - Prevent next time: Check frontend container health when the API works and Traefik returns 404 for the homepage.
+
+# AI Used: ChatGPT
+
+- Gallery loading presentation and request timing:
+  - Reason: Remove the dark loader box and enlarged grainy thumbnail seen before the 3D model appears.
+  - Investigation: Traced ModelPreview, gallery CSS, the HTML entry point, and API asset responses. Measured public gallery metadata, Bowser's thumbnail, and the optimized GLB.
+  - Root cause: The stage enlarged the card thumbnail and placed a dark loading panel over it. Model discovery followed viewer-module initialization. Public asset requests also had substantial transfer and response times.
+  - Change made: Show a single stage loader on the gradient. Keep still images in the collection and failure fallback. Load the selected card image eagerly, preload the viewer module and selected saved GLB, and keep the viewer's own loading surface transparent.
+  - Why this approach: Overlap viewer and model retrieval without hardcoding a featured figure or introducing browser-only persistence.
+- Files touched: Gallery component and CSS, App test, frontend entry HTML, README, and this journal.
+- Database changes or migrations applied: None.
+- Results: The public gallery request took 2.52 seconds. The 23,210-byte thumbnail took 3.18 seconds and the 3,470,788-byte web GLB took 17.31 seconds on the measured connection. Local frontend and API returned 200. Browser visual QA was attempted but the browser host was unavailable.
+- Current blockers or risks: Frontend changes are local. Production cold-load improvement still needs browser timing after deployment.
+- Tests and verification commands run: Full frontend Jest suite inside the existing Docker container with fresh transforms, local routed HTTP probes, served HTML preload check, public curl timings, Compose container inspection, and git diff --check.
+- Verification outcome: 21 tests passed. The regression verifies the card thumbnail remains available, the stage omits it during loading, the optimized model is preloaded, and a viewer failure still displays the fallback and retry. The Compose stack showed only the existing frontend and backend.
+
+# AI Used: ChatGPT
+
+- Restore local gallery database access:
+  - Reason: The gallery showed the database-unavailable error.
+  - Investigation: Production figures returned HTTP 200. Local health returned 200 but figures returned 503. Local backend logs reported password authentication failures, and its running connection configuration differed from the current Compose configuration.
+  - Root cause: The local backend was still running with stale database settings.
+  - Change made: Recreated the local backend using the current Compose environment.
+  - Why this approach: Apply the existing configuration without changing stored credentials or application code.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Public and local HTTP probes, sanitized log classification, redacted configuration comparison, and local backend recreation.
+- Results: Local figures returned HTTP 200 with Bowser. The new container logs showed no database connection errors.
+- Prevent next time: Recreate the backend after changing its database environment and verify /api/figures as well as /api/health.
+
+# AI Used: ChatGPT
+
+- Continuous gallery stage progress:
+  - Reason: Keep one progress animation visible while the gallery and 3D model load.
+  - Investigation: Reviewed the stage, model progress events, initial viewer preload, and previously measured asset transfer times.
+  - Root cause: The stage swapped to the bar only for progress between 0 and 100, with separate spinners before and after that range.
+  - Change made: Use one native bar style from gallery discovery through model preparation. Skip the extra GLB preload hint when the viewer is registered, stabilize viewer event binding across progress updates, and remove the progress listener when loading ends.
+  - Why this approach: Show actual reported progress and preserve early loading on a cold viewer without redundant setup on a warm viewer.
+- Files touched: Gallery JSX and CSS, App test, README, and this journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Full Jest suite in the running Docker frontend, routed HTTP checks, Compose service inspection, and git diff --check.
+- Results: 21 tests passed. Regression covers indeterminate gallery and model progress, the same model bar at 45 and 100 percent, and the fallback on viewer error. Local frontend, health, and gallery routes returned 200. No extra services were created.
+- Current blockers or risks: Production timing and visual checks remain pending deployment.
+
+# AI Used: ChatGPT
+
+- Gallery loading stress QA:
+  - Reason: Exercise the new loader under noisy progress events, a render failure, and a retry.
+  - Investigation: Tested out-of-order and invalid progress events, a failed viewer, a cache-bypassing retry, and a successful viewer load. Started read-only concurrent local route and asset checks.
+  - Root cause: A lower progress event could move the bar backward within the same attempt.
+  - Change made: Keep displayed progress monotonic for each attempt and extend the regression through retry and successful load.
+  - Why this approach: Preserve measured progress and reset it explicitly for the next try.
+- Files touched: Gallery component, App test, and this journal.
+- Database changes or migrations applied: None.
+- Current blockers or risks: The in-app browser host was unavailable for desktop and mobile visual QA.
+- Tests and verification commands run: Full Docker frontend Jest and backend pytest suites, five-worker and three-worker HTTP batches, container inspection, and git diff --check.
+- Results: 21 frontend and 44 backend tests passed. The five-worker batch had a timeout. All 10 requests in the three-worker rerun returned 200. Both optimized GLBs matched by checksum and had valid headers and lengths, taking 19.36 and 21.35 seconds. Both thumbnails matched and took 1.42 and 3.68 seconds. Only the normal frontend and backend containers remained.
+
+# AI Used: ChatGPT
+
+- Boilerplate portability and burst QA:
+  - Reason: Evaluate reuse and extend the gallery stress checks.
+  - Investigation: Rendered production and development Compose with a throwaway sample .env. Reviewed project defaults, secret handling, onboarding, routing, and development database selection. Exercised the local stack with six concurrent workers.
+  - Root cause: No new functional failure in the burst. Copying the repo still carries app-specific defaults, and the two Compose files derive the same local image names when run under the same project name.
+  - Change made: Journal entry only.
+- Files touched: This journal.
+- Database changes or migrations applied: None.
+- Tests and verification commands run: Both Compose renders with sample settings, 25 local GETs, shell and automation checks, and git diff --check.
+- Results: Both renders applied the new project name, hosts, router namespace, and database schema without publishing host ports. The burst returned all expected statuses, including 401 and 404. The slowest gallery-list response was 1.04 seconds. Previous asset-heavy stress still measured 19 to 21 seconds per web model and one timeout at five workers.
+- Current blockers or risks: Desktop and mobile browser validation remains open. Production requires project-specific metadata, strong signing credentials, and deliberate database separation.
+- Build verification: The production frontend compiled in Docker under an isolated Compose project. The normal development stack retained only its frontend and backend, and the build project had no containers.
+- Boilerplate follow-up: Make inherited project values explicit, guard production signing secrets and development database selection, and make public registration a product setting. Keep media delivery as a clay-gallery concern.
