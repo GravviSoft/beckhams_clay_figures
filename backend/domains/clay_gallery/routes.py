@@ -24,7 +24,11 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
 
     @blueprint.get("")
     def list_figures():
-        return jsonify(figures=service.list_figures(get_db))
+        response = jsonify(figures=service.list_figures(get_db))
+        response.headers["Cache-Control"] = ("private, no-store" if request.headers.get("Authorization")
+                                             else "public, max-age=0, s-maxage=15")
+        response.vary.add("Authorization")
+        return response
 
     @blueprint.get("/authoring")
     @require_auth

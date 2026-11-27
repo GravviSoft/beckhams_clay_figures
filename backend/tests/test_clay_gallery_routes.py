@@ -29,6 +29,10 @@ def test_gallery_is_public(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json()["figures"] == [FIGURE]
+    assert response.headers["Cache-Control"] == "public, max-age=0, s-maxage=15"
+    assert "Authorization" in response.vary
+    signed_in = client.get("/api/figures", headers={"Authorization": "Bearer test-session"})
+    assert signed_in.headers["Cache-Control"] == "private, no-store"
 
 
 def test_only_web_model_get_can_use_signed_delivery(client, monkeypatch):

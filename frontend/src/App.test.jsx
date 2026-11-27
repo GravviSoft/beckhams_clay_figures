@@ -13,7 +13,19 @@ jest.mock('./domains/clay_gallery/galleryApi', () => ({
 }));
 
 beforeEach(() => {
+  window.localStorage.removeItem('clay-gallery:public-figures:v1');
   listFigures.mockResolvedValue([]);
+});
+
+test('a returning visitor sees cached cards while the gallery refreshes', async () => {
+  window.localStorage.setItem('clay-gallery:public-figures:v1', JSON.stringify({
+    savedAt: Date.now(), items: [{ id: 1, character_name: 'Bowser', assets: [] }],
+  }));
+  listFigures.mockResolvedValue([{ id: 2, character_name: 'Predator 2', assets: [] }]);
+  render(<MemoryRouter><App /></MemoryRouter>);
+  expect(screen.getByRole('button', { name: 'Bowser' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Predator 2' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Bowser' })).not.toBeInTheDocument();
 });
 
 test('collection search and sort apply to cards', async () => {

@@ -10,6 +10,17 @@ import ViewerControls from './ViewerControls';
 import './ClayGalleryPage.css';
 
 const localPreview = process.env.NODE_ENV === 'development';
+const figureSnapshotKey = 'clay-gallery:public-figures:v1';
+
+function readFigureSnapshot() {
+  try {
+    const snapshot = JSON.parse(window.localStorage.getItem(figureSnapshotKey));
+    return Array.isArray(snapshot?.items) && Date.now() - snapshot.savedAt < 24 * 60 * 60 * 1000
+      ? snapshot.items : null;
+  } catch {
+    return null;
+  }
+}
 const webModelThreshold = 4 * 1024 * 1024;
 const bundledModels = {
   1: { name: 'Bowser', size: 3470788, filename: 'bowser-web-v1.glb' },
@@ -253,7 +264,8 @@ function ModelPreview({ file, source, retrySource = source, title, poster, onRea
 export default function ClayGalleryPage() {
   const { signedIn, canFeature, editableFigureIds, markEditable, requestSignIn } = useOutletContext();
   const [params, setParams] = useSearchParams();
-  const [figures, setFigures] = useState(null);
+  const [figures, setFigures] = useState(readFigureSnapshot);
+  const initialSnapshot = useRef(figures);
   const [collectionSearch, setCollectionSearch] = useState('');
   const [collectionSort, setCollectionSort] = useState('featured');
   const [error, setError] = useState('');
@@ -378,9 +390,18 @@ export default function ClayGalleryPage() {
     let active = true;
     listFigures()
       .then((items) => {
-        if (active) setFigures((current) => current
+        if (!active) return;
+        try {
+          window.localStorage.setItem(figureSnapshotKey, JSON.stringify({ items, savedAt: Date.now() }));
+        } catch {
+          // The gallery also works when browser storage is unavailable.
+        }
+        const snapshot = initialSnapshot.current;
+        setFigures((current) => current && current !== snapshot
           ? [...current, ...items.filter((item) => !current.some(({ id }) => id === item.id))]
           : items);
+        initialSnapshot.current = null;
+        setError('');
       })
       .catch((err) => { if (active) setError(err.message); });
     return () => { active = false; };
