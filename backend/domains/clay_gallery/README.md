@@ -25,6 +25,19 @@ backend container, then run `python scripts/publish_figure_web_assets.py
 checks the source checksum against R2, preserves the original and any
 existing derivative, and attaches the new assets only after storage succeeds.
 
+### Pilot direct web-model delivery
+
+Allow `GET` from the exact development and production gallery origins in the
+R2 bucket CORS policy. Preserve any existing upload rules. Test a signed GET
+with the actual browser origin before setting `CLAY_GALLERY_DIRECT_WEB_MODELS=1`
+and recreating the backend. The switch redirects only optimized `web_model`
+GET requests to a five-minute signed R2 URL. The original GLB, posters, and
+retry requests retain their existing relay paths.
+
+Compare a cold browser download and the time until the model can rotate.
+Signed R2 delivery bypasses Flask. A CDN-cached endpoint for public derivatives
+can be evaluated separately if the direct path still needs improvement.
+
 Viewing is public. Any signed-in account can upload and edit its own figures.
 The `CLAY_GALLERY_OWNER_USER_ID` setting controls the gallery-wide featured
 model action. The browser sends files

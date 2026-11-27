@@ -34,3 +34,13 @@ def open_asset(key):
         return client.get_object(Bucket=bucket, Key=key)["Body"]
     except (BotoCoreError, ClientError) as error:
         raise unavailable() from error
+
+
+def signed_model_url(key):
+    try:
+        client, bucket = bucket_client()
+        return client.generate_presigned_url(
+            "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=300,
+        )
+    except (BotoCoreError, ClientError) as error:
+        raise unavailable() from error

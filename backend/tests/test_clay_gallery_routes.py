@@ -31,6 +31,30 @@ def test_gallery_is_public(client, monkeypatch):
     assert response.get_json()["figures"] == [FIGURE]
 
 
+def test_only_web_model_get_can_use_signed_delivery(client, monkeypatch):
+    monkeypatch.setenv("CLAY_GALLERY_DIRECT_WEB_MODELS", "1")
+    monkeypatch.setattr(service, "display_asset_metadata", lambda *args: {"storage_key": "figures/web.glb"})
+    monkeypatch.setattr(storage, "signed_model_url", lambda key: f"https://example.test/{key}?signed=1")
+
+    class Body:
+        def iter_chunks(self, _size):
+            return iter([b"glb"])
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(service, "display_asset", lambda *args: (
+        {"content_type": "model/gltf-binary", "size_bytes": 3}, Body(),
+    ))
+    base = "/api/figures/4/assets"
+    response = client.get(f"{base}/web_model")
+    assert response.status_code == 302
+    assert response.location == "https://example.test/figures/web.glb?signed=1"
+    assert response.headers["Cache-Control"] == "no-store"
+    assert client.get(f"{base}/web_model?retry=1").data == b"glb"
+    assert client.get(f"{base}/display_model").data == b"glb"
+
+
 def test_large_glb_is_validated_without_buffering_the_model(monkeypatch):
     size = 51 * 1024 * 1024
     monkeypatch.delenv("CLAY_GALLERY_MODEL_MAX_MB", raising=False)

@@ -118,13 +118,18 @@ def create_figure(get_db, owner_id, form, files):
         raise
 
 
-def display_asset(get_db, figure_id, asset_type):
+def display_asset_metadata(get_db, figure_id, asset_type):
     if asset_type not in {"display_model", "web_model", "gallery_poster", "model_thumbnail"}:
         raise NotFoundError("Figure asset not found.")
     with transaction(get_db) as connection:
         asset = repository.find_display_asset(connection, figure_id, asset_type)
     if not asset:
         raise NotFoundError("Figure asset not found.")
+    return asset
+
+
+def display_asset(get_db, figure_id, asset_type):
+    asset = display_asset_metadata(get_db, figure_id, asset_type)
     return asset, storage.open_asset(asset["storage_key"])
 
 

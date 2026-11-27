@@ -1,10 +1,12 @@
 """HTTP contract for the publicly viewable clay gallery."""
 
-from flask import Blueprint, Response, g, jsonify, request
+import os
 
-from core.errors import ValidationError
+from flask import Blueprint, Response, g, jsonify, redirect, request
 
-from . import direct_upload, service
+from core.errors import DomainError, ValidationError
+
+from . import direct_upload, service, storage
 
 
 def upload_body():
@@ -72,6 +74,18 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
 
     @blueprint.get("/<int:figure_id>/assets/<asset_type>")
     def get_asset(figure_id, asset_type):
+        if (asset_type == "web_model" and request.method == "GET"
+                and os.getenv("CLAY_GALLERY_DIRECT_WEB_MODELS") == "1"
+                and "retry" not in request.args):
+            asset = service.display_asset_metadata(get_db, figure_id, asset_type)
+            try:
+                url = storage.signed_model_url(asset["storage_key"])
+            except DomainError:
+                pass  # Relay when signing is unavailable.
+            else:
+                response = redirect(url)
+                response.headers["Cache-Control"] = "no-store"
+                return response
         asset, body = service.display_asset(get_db, figure_id, asset_type)
         response = Response(body.iter_chunks(64 * 1024), content_type=asset["content_type"])
         response.content_length = asset["size_bytes"]

@@ -44,12 +44,12 @@ function loadViewer() {
   return viewerReady;
 }
 
-function StageProgress({ label, progress = null }) {
-  const message = progress === 100 ? 'Preparing model…' : `${label}…`;
+function StageProgress({ label, progress = null, preparing = false }) {
+  const message = preparing || progress === 100 ? 'Preparing model…' : `${label}…`;
   return (
     <div className="clay-stage__loading">
-      <p>{message}{progress !== null && ` ${progress}%`}</p>
-      <progress aria-label={label} max={100} value={progress ?? undefined} />
+      <p>{message}{!preparing && progress !== null && ` ${progress}%`}</p>
+      <progress aria-label={label} max={100} value={preparing ? undefined : progress ?? undefined} />
     </div>
   );
 }
@@ -71,6 +71,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
   const [url, setUrl] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState(null);
+  const [transferred, setTransferred] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [orbit, setOrbit] = useState(null);
@@ -83,7 +84,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
       setError('The 3D model stopped making progress. Retry to open it again.');
     }, 45000);
     return () => window.clearTimeout(timeout);
-  }, [attempt, error, loaded, progress]);
+  }, [attempt, error, loaded, progress, transferred]);
 
   useEffect(() => {
     const element = viewerRef.current;
@@ -116,6 +117,16 @@ function ModelPreview({ file, source, title, poster, onReady }) {
     }
     const preload = !file && !attempt && !customElements.get('model-viewer')
       ? document.createElement('link') : null;
+    let observer;
+    if (!file && window.PerformanceObserver?.supportedEntryTypes?.includes('resource')) {
+      const modelUrl = new URL(objectUrl, window.location.href).href;
+      observer = new window.PerformanceObserver((entries) => {
+        if (active && entries.getEntries().some(({ name, responseEnd }) => name === modelUrl && responseEnd > 0)) {
+          setTransferred(true);
+        }
+      });
+      observer.observe({ type: 'resource' });
+    }
     if (preload) {
       preload.rel = 'preload';
       preload.setAttribute('as', 'fetch');
@@ -130,6 +141,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
     });
     return () => {
       active = false;
+      observer?.disconnect();
       preload?.remove();
       if (file) URL.revokeObjectURL(objectUrl);
     };
@@ -150,8 +162,16 @@ function ModelPreview({ file, source, title, poster, onReady }) {
       setOrbit(initialOrbit);
       onReady?.(element);
     };
-    element.onerror = () => setError('Try another GLB and check that your browser supports WebGL.');
-  }, [onReady]);
+    element.onerror = ({ detail }) => {
+      if (detail?.type === 'webglcontextlost') {
+        setError('The browser lost its 3D graphics context. Retry to restart the viewer.');
+      } else if (file) {
+        setError('The viewer could not open this GLB. Retry or choose another file.');
+      } else {
+        setError('The viewer could not download or prepare this saved model. Retry to load it again.');
+      }
+    };
+  }, [file, onReady]);
 
   function setCameraGoal(element, attribute, value) {
     // A distinct attribute string reapplies the same goal after manual orbit or zoom.
@@ -177,6 +197,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
       <button type="button" onClick={() => {
         setUrl('');
         setProgress(null);
+        setTransferred(false);
         setLoaded(false);
         setOrbit(null);
         setError('');
@@ -191,7 +212,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
           <model-viewer ref={bindViewer} src={url} alt={title || file?.name}
             loading="eager" camera-controls touch-action="pan-y" min-field-of-view="15deg" shadow-intensity="0.8" />
         )}
-        {!loaded && <StageProgress label="Loading model" progress={progress} />}
+        {!loaded && <StageProgress label="Loading model" progress={progress} preparing={transferred} />}
       </div>
       {loaded && orbit && <ViewerControls orbit={orbit}
         onZoom={(step) => viewerRef.current.zoom(step)} onReset={resetView} onAxis={alignAxis} />}
