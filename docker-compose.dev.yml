@@ -70,6 +70,18 @@ services:
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web-dev.service=${APP_SLUG:-becks-clay-figures}-web-dev
       - traefik.http.services.${APP_SLUG:-becks-clay-figures}-web-dev.loadbalancer.server.port=3000
 
+  gallery-worker:
+    profiles: ["gallery-assets"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.gallery-worker
+    env_file: .env
+    environment:
+      CONNECTION_STRING: ${DEV_CONNECTION_STRING:-${CONNECTION_STRING}}
+    restart: unless-stopped
+    mem_limit: 3g
+    cpus: 2
+
   example-job:
     profiles: ["jobs"]
     build:

@@ -44,7 +44,7 @@ def test_only_web_model_get_can_use_signed_delivery(client, monkeypatch):
             pass
 
     monkeypatch.setattr(service, "display_asset", lambda *args: (
-        {"content_type": "model/gltf-binary", "size_bytes": 3}, Body(),
+        {"id": 9, "content_type": "model/gltf-binary", "size_bytes": 3}, Body(),
     ))
     base = "/api/figures/4/assets"
     response = client.get(f"{base}/web_model")
@@ -53,6 +53,9 @@ def test_only_web_model_get_can_use_signed_delivery(client, monkeypatch):
     assert response.headers["Cache-Control"] == "no-store"
     assert client.get(f"{base}/web_model?retry=1").data == b"glb"
     assert client.get(f"{base}/display_model").data == b"glb"
+    monkeypatch.delenv("CLAY_GALLERY_DIRECT_WEB_MODELS")
+    assert client.get(f"{base}/web_model?v=9").headers["Cache-Control"] == "public, max-age=31536000, immutable"
+    assert "immutable" not in client.get(f"{base}/web_model?v=9&retry=1").headers["Cache-Control"]
 
 
 def test_large_glb_is_validated_without_buffering_the_model(monkeypatch):

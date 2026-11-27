@@ -35,13 +35,13 @@ test('collection search and sort apply to cards', async () => {
   expect(collection.queryByRole('button', { name: 'Predator' })).not.toBeInTheDocument();
 });
 
-test('a saved figure shows its thumbnail in the card and uses it on viewer failure', async () => {
+test('Bowser loads the bundled 3D model and can retry from the saved model endpoint', async () => {
   window.localStorage.clear();
   listFigures.mockResolvedValue([{
     id: 1, character_name: 'Bowser', assets: [
-      { asset_type: 'display_model' }, { asset_type: 'web_model' }, { asset_type: 'model_thumbnail' },
+      { asset_type: 'display_model' }, { asset_type: 'web_model', size_bytes: 3470788 }, { asset_type: 'model_thumbnail' },
     ],
-  }]);
+  }, { id: 2, character_name: 'Predator 2', assets: [{ asset_type: 'web_model', size_bytes: 3527864 }] }]);
   render(<MemoryRouter initialEntries={['/?figure=1']}><App /></MemoryRouter>);
   expect(screen.getByRole('progressbar', { name: 'Loading clay figure gallery' })).not.toHaveAttribute('value');
   await act(async () => { await listFigures.mock.results[0].value; });
@@ -51,7 +51,7 @@ test('a saved figure shows its thumbnail in the card and uses it on viewer failu
   const card = screen.getByRole('button', { name: 'Bowser' });
   expect(card.querySelector('img')).toHaveAttribute('loading', 'eager');
   await waitFor(() => expect(document.head.querySelector('link[as="fetch"]')).toHaveAttribute(
-    'href', '/api/figures/1/assets/web_model',
+    'href', '/gallery/bowser-web-v1.glb',
   ));
   const viewerDefinition = jest.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
   fireEvent.load(document.head.querySelector('script[type="module"]'));
@@ -70,9 +70,8 @@ test('a saved figure shows its thumbnail in the card and uses it on viewer failu
   expect(bar).toHaveAttribute('value', '100');
   expect(screen.getByText('Preparing model… 100%')).toBeInTheDocument();
   fireEvent.error(viewer);
-  expect(await screen.findByRole('img', { name: 'Bowser' })).toHaveAttribute(
-    'src', '/gallery/bowser-studio-v1.webp',
-  );
+  expect(await screen.findByText('The 3D preview could not load')).toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'Bowser' })).not.toBeInTheDocument();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry model' })); });
   expect(screen.getByRole('progressbar', { name: 'Loading model' })).not.toHaveAttribute('value');
   const retriedViewer = document.querySelector('model-viewer');
@@ -84,6 +83,13 @@ test('a saved figure shows its thumbnail in the card and uses it on viewer failu
   fireEvent.load(retriedViewer);
   expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   expect(screen.queryByRole('img', { name: 'Bowser' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Predator 2' }));
+  await waitFor(() => expect(document.querySelector('model-viewer[src="/gallery/predator-2-web-v1.glb"]'))
+    .toBeInTheDocument());
+  expect(retriedViewer.closest('[hidden]')).not.toBeNull();
+  fireEvent.click(card);
+  expect(retriedViewer.closest('[hidden]')).toBeNull();
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
 });
 
 test('signed-out visitors see the public gallery', async () => {

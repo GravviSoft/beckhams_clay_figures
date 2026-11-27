@@ -10,12 +10,42 @@ import ViewerControls from './ViewerControls';
 import './ClayGalleryPage.css';
 
 const localPreview = process.env.NODE_ENV === 'development';
+const webModelThreshold = 4 * 1024 * 1024;
+const bundledModels = {
+  1: { name: 'Bowser', size: 3470788, filename: 'bowser-web-v1.glb' },
+  2: { name: 'Predator 2', size: 3527864, filename: 'predator-2-web-v1.glb' },
+};
 function studioPoster(item) {
   if (!item?.assets?.some(({ asset_type }) => asset_type === 'web_model')
       || item.assets.some(({ asset_type }) => asset_type === 'gallery_poster')) return undefined;
   const filename = item.id === 1 && item.character_name === 'Bowser' ? 'bowser-studio-v1.webp'
     : item.id === 2 && item.character_name === 'Predator 2' ? 'predator-2-studio-v1.webp' : null;
   return filename ? `${process.env.PUBLIC_URL ?? ''}/gallery/${filename}` : undefined;
+}
+
+function figurePoster(item) {
+  const asset = item?.assets?.find(({ asset_type }) => asset_type === 'gallery_poster')
+    ?? item?.assets?.find(({ asset_type }) => asset_type === 'model_thumbnail');
+  return studioPoster(item) ?? (asset
+    ? `${figureAssetUrl(item.id, asset.asset_type)}?v=${encodeURIComponent(item.updated_at ?? '')}` : undefined);
+}
+
+function savedPreview(item) {
+  const web = item?.assets?.find(({ asset_type }) => asset_type === 'web_model');
+  const asset = web ?? item?.assets?.find(({ asset_type }) => asset_type === 'display_model');
+  if (!asset) return null;
+  const endpoint = figureAssetUrl(item.id, asset.asset_type);
+  const retrySource = web?.id ? `${endpoint}?v=${encodeURIComponent(web.id)}` : endpoint;
+  const bundled = bundledModels[item.id];
+  const staticSource = bundled && item.character_name === bundled.name && web?.size_bytes === bundled.size
+    ? `${process.env.PUBLIC_URL ?? ''}/gallery/${bundled.filename}` : undefined;
+  return {
+    key: `saved-${item.id}-${item.localFile ? 'local' : asset.asset_type}`,
+    id: item.id, title: item.character_name, file: item.localFile,
+    source: item.localFile ? undefined : staticSource ?? retrySource,
+    retrySource: item.localFile ? undefined : retrySource,
+    poster: staticSource ? undefined : figurePoster(item),
+  };
 }
 const viewerModule = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.1.0/dist/model-viewer.min.js';
 let viewerReady;
@@ -67,7 +97,7 @@ function FigureTileInfo({ name, madeOn, description }) {
   );
 }
 
-function ModelPreview({ file, source, title, poster, onReady }) {
+function ModelPreview({ file, source, retrySource = source, title, poster, onReady }) {
   const [url, setUrl] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState(null);
@@ -111,7 +141,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
     let active = true;
     let objectUrl = file ? URL.createObjectURL(file) : source;
     if (!file && attempt) {
-      const retryUrl = new URL(source, window.location.href);
+      const retryUrl = new URL(retrySource, window.location.href);
       retryUrl.searchParams.set('retry', String(attempt));
       objectUrl = retryUrl.href;
     }
@@ -145,7 +175,7 @@ function ModelPreview({ file, source, title, poster, onReady }) {
       preload?.remove();
       if (file) URL.revokeObjectURL(objectUrl);
     };
-  }, [file, source, attempt]);
+  }, [file, source, retrySource, attempt]);
 
   const bindViewer = useCallback((element) => {
     viewerRef.current = element;
@@ -236,7 +266,8 @@ export default function ClayGalleryPage() {
   const editing = previews.find(({ id }) => id === editId);
   const savedEditing = figures?.find(({ id }) => id === savedEditId);
   const [uploadedId, setUploadedId] = useState(null);
-  const [thumbnailViewer, setThumbnailViewer] = useState(null);
+  const [thumbnailViewers, setThumbnailViewers] = useState({});
+  const [recentFigureIds, setRecentFigureIds] = useState([]);
   const thumbnailAttempts = useRef(new Set());
   const thumbnailInFlight = useRef(new Set());
   const localThumbnails = useRef(new Map());
@@ -248,15 +279,26 @@ export default function ClayGalleryPage() {
   const preview = previews.find(({ id }) => id === previewId);
   const [fileError, setFileError] = useState('');
   const figure = figures?.find(({ id }) => String(id) === (uploadedId ?? params.get('figure'))) ?? figures?.[0];
-  const webAsset = figure?.assets?.find(({ asset_type }) => asset_type === 'web_model');
-  const modelAsset = webAsset ?? figure?.assets?.find(({ asset_type }) => asset_type === 'display_model');
-  const hasModel = Boolean(modelAsset);
-  const posterAsset = figure?.assets?.find(({ asset_type }) => asset_type === 'gallery_poster')
-    ?? figure?.assets?.find(({ asset_type }) => asset_type === 'model_thumbnail');
-  const stagePoster = studioPoster(figure) ?? (posterAsset
-    ? `${figureAssetUrl(figure.id, posterAsset.asset_type)}?v=${encodeURIComponent(figure.updated_at ?? '')}` : undefined);
+  const hasModel = Boolean(savedPreview(figure));
+  const stagePoster = figurePoster(figure);
   const madeOn = preview ? preview.madeOn : figure?.made_on;
   const visibleFigureId = !preview && hasModel ? figure.id : null;
+  const mountedFigureIds = visibleFigureId === null ? recentFigureIds
+    : [visibleFigureId, ...recentFigureIds.filter((id) => id !== visibleFigureId)].slice(0, 2);
+  const thumbnailViewer = thumbnailViewers[visibleFigureId];
+
+  useEffect(() => {
+    if (visibleFigureId === null) return;
+    setRecentFigureIds((ids) => ids[0] === visibleFigureId ? ids
+      : [visibleFigureId, ...ids.filter((id) => id !== visibleFigureId)].slice(0, 2));
+  }, [visibleFigureId]);
+
+  useEffect(() => {
+    setThumbnailViewers((viewers) => {
+      const retained = Object.entries(viewers).filter(([, viewer]) => recentFigureIds.includes(viewer.id));
+      return retained.length === Object.keys(viewers).length ? viewers : Object.fromEntries(retained);
+    });
+  }, [recentFigureIds]);
   const collectionRows = [
     ...previews.map((draft) => ({
       key: `draft-${draft.id}`, draft, name: draft.name, madeOn: draft.madeOn,
@@ -344,6 +386,36 @@ export default function ClayGalleryPage() {
     return () => { active = false; };
   }, [signedIn]);
 
+  const selectedModelPending = figure?.assets?.some((asset) =>
+    asset.asset_type === 'display_model' && asset.size_bytes > webModelThreshold)
+    && !figure.assets.some((asset) => asset.asset_type === 'web_model');
+  const selectedId = figure?.id;
+  useEffect(() => {
+    if (!selectedModelPending || !selectedId) return undefined;
+    let active = true;
+    let timer;
+    let checks = 0;
+    async function checkForWebModel() {
+      try {
+        const items = await listFigures();
+        const updated = items.find((item) => item.id === selectedId);
+        if (active && updated?.assets?.some(({ asset_type }) => asset_type === 'web_model')) {
+          setFigures((current) => current?.map((item) => item.id === selectedId
+            ? { ...updated, localFile: item.localFile } : item));
+          return;
+        }
+      } catch {
+        // The existing model remains available during a transient API failure.
+      }
+      if (active && ++checks < 30) timer = window.setTimeout(checkForWebModel, 10000);
+    }
+    timer = window.setTimeout(checkForWebModel, 10000);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [selectedId, selectedModelPending]);
+
   function chooseFile(event) {
     const persist = event.currentTarget === filePicker.current;
     const file = event.target.files?.[0];
@@ -382,7 +454,9 @@ export default function ClayGalleryPage() {
       markEditable(id, token);
       const saved = {
         id, character_name: draft.name, made_on: draft.madeOn, description: draft.description,
-        assets: [{ asset_type: 'display_model' }, ...(draft.poster ? [{ asset_type: 'gallery_poster' }] : [])],
+        localFile: activeUpload.current === draft.id ? draft.file : undefined,
+        assets: [{ asset_type: 'display_model', size_bytes: draft.file.size },
+          ...(draft.poster ? [{ asset_type: 'gallery_poster' }] : [])],
       };
       setFigures((items) => {
         const remaining = (items ?? []).filter((item) => item.id !== id);
@@ -488,12 +562,22 @@ export default function ClayGalleryPage() {
           </div>
         </header>
         <div className="clay-stage__view">
+          {/* Keep the DOM order stable when swapping active viewers. */}
+          {[...mountedFigureIds].sort((a, b) => a - b).map((id) => {
+            const entry = savedPreview(figures?.find((item) => item.id === id));
+            if (!entry) return null;
+            const { key, id: figureId, ...viewerProps } = entry;
+            return (
+              <div key={key} hidden={visibleFigureId !== id}>
+                <ModelPreview {...viewerProps}
+                  onReady={(element) => setThumbnailViewers((viewers) => ({
+                    ...viewers, [figureId]: { id: figureId, element },
+                  }))} />
+              </div>
+            );
+          })}
           {preview ? <ModelPreview key={preview.id} file={preview.file}
-            onReady={(element) => rememberLocalThumbnail(preview.id, element)} /> : hasModel ? (
-              <ModelPreview key={`saved-${figure.id}-${modelAsset.asset_type}`} title={figure.character_name}
-                source={figureAssetUrl(figure.id, modelAsset.asset_type)} poster={stagePoster}
-                onReady={(element) => setThumbnailViewer({ id: figure.id, element })} />
-            ) : figures === null && !error ? (
+            onReady={(element) => rememberLocalThumbnail(preview.id, element)} /> : hasModel ? null : figures === null && !error ? (
               <div className="clay-model-viewport">
                 <StageProgress label="Loading clay figure gallery" />
               </div>

@@ -16,6 +16,29 @@ inspiration images, gallery posters, display models, and source models.
 
 ### Prepare web assets for a large saved model
 
+The gallery worker picks up saved originals from either upload path. It
+generates a transparent studio PNG when a figure lacks an image, and creates a
+smaller web GLB for originals above 4 MiB when optimization reduces file size.
+Run one worker per database schema. For localhost, start it with
+`docker compose -f docker-compose.dev.yml up -d --build gallery-worker`.
+For production, use the same command with `docker-compose.yml` on the server.
+Uploads finish independently of processing. The original remains available
+while derivatives are prepared, and a failed job is deferred for 15 minutes
+so other figures can proceed. Inspect worker logs with
+`docker compose logs gallery-worker`.
+
+Optimized models use an asset-ID version in the URL. For a Cloudflare-proxied
+production hostname, create a [Cache Rule](https://developers.cloudflare.com/cache/how-to/cache-rules/)
+that matches only requests to `/api/figures/…/assets/web_model` whose full
+query string is a single `v` parameter. Keep the query string in the cache key,
+set the requests as eligible for cache, and respect the origin cache headers.
+Verify a warm request reports `CF-Cache-Status: HIT`. Leave
+`CLAY_GALLERY_DIRECT_WEB_MODELS=0` on this route so the cache receives the
+model response. The original model, authoring APIs, and retry URLs are outside
+the rule.
+
+For manual asset preparation:
+
 Run Blender in background mode with `--python-exit-code 1 --python
 backend/domains/clay_gallery/render_web_assets.py -- <original.glb>
 <existing-output-directory>`. Review `web.glb` and `thumbnail.jpg` before

@@ -94,6 +94,9 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
             # Image URLs are versioned by the figure's updated timestamp in the
             # UI, so immutable caching avoids repeating the R2 relay.
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif (asset_type == "web_model" and asset.get("id")
+                and request.args.get("v") == str(asset["id"]) and "retry" not in request.args):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         else:
             response.headers["Cache-Control"] = "public, max-age=86400"
         response.call_on_close(body.close)

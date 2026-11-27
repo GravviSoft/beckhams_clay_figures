@@ -66,9 +66,29 @@ def insert_figure(connection, owner_id, details, assets):
 def find_display_asset(connection, figure_id, asset_type):
     with connection.cursor() as cursor:
         cursor.execute(
-            """SELECT storage_key, content_type, size_bytes FROM assets
+            """SELECT id, storage_key, content_type, size_bytes FROM assets
                WHERE figure_id = %s AND asset_type = %s""",
             (figure_id, asset_type),
+        )
+        return cursor.fetchone()
+
+
+def pending_web_asset(connection, threshold, excluded_ids):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT original.figure_id, COALESCE(web.storage_key, original.storage_key) AS storage_key,
+                      COALESCE(web.size_bytes, original.size_bytes) AS size_bytes,
+                      (original.size_bytes > %s AND web.id IS NULL) AS needs_model,
+                      (card.id IS NULL AND poster.id IS NULL) AS needs_card
+               FROM assets original
+               LEFT JOIN assets web ON web.figure_id = original.figure_id AND web.asset_type = 'web_model'
+               LEFT JOIN assets card ON card.figure_id = original.figure_id AND card.asset_type = 'model_thumbnail'
+               LEFT JOIN assets poster ON poster.figure_id = original.figure_id AND poster.asset_type = 'gallery_poster'
+               WHERE original.asset_type = 'display_model' AND NOT (original.figure_id = ANY(%s))
+                 AND ((original.size_bytes > %s AND web.id IS NULL) OR (card.id IS NULL AND poster.id IS NULL))
+               ORDER BY original.id
+               LIMIT 1""",
+            (threshold, excluded_ids, threshold),
         )
         return cursor.fetchone()
 
