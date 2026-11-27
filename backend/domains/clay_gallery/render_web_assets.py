@@ -12,21 +12,22 @@ def point_at(obj, target):
     obj.rotation_euler = (target - obj.location).to_track_quat("-Z", "Y").to_euler()
 
 
-def render(source, output, target_triangles):
+def render(source, output, target_triangles, card_only=False):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(source))
     meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH"]
     if not meshes:
         raise ValueError("The file has no renderable mesh.")
     initial = sum(len(obj.data.polygons) for obj in meshes)
-    ratio = min(1, target_triangles / initial)
+    ratio = 1 if card_only else min(1, target_triangles / initial)
     if ratio < 1:
         for obj in meshes:
             bpy.context.view_layer.objects.active = obj
             modifier = obj.modifiers.new("Web mesh reduction", "DECIMATE")
             modifier.ratio = ratio
             bpy.ops.object.modifier_apply(modifier=modifier.name)
-    bpy.ops.export_scene.gltf(filepath=str(output / "web.glb"), export_format="GLB")
+    if not card_only:
+        bpy.ops.export_scene.gltf(filepath=str(output / "web.glb"), export_format="GLB")
     print(f"Mesh faces: {initial} -> {sum(len(obj.data.polygons) for obj in meshes)}", flush=True)
 
     corners = [obj.matrix_world @ Vector(corner) for obj in meshes for corner in obj.bound_box]
@@ -65,6 +66,15 @@ def render(source, output, target_triangles):
     scene.cycles.use_denoising = True
     scene.render.resolution_x = scene.render.resolution_y = 384
     scene.render.resolution_percentage = 100
+    if card_only:
+        camera.data.ortho_scale = span * 1.24
+        scene.render.film_transparent = True
+        scene.cycles.samples = 24
+        scene.render.image_settings.file_format = "PNG"
+        scene.render.image_settings.color_mode = "RGBA"
+        scene.render.filepath = str(output / "card.png")
+        bpy.ops.render.render(write_still=True)
+        return
     scene.render.image_settings.file_format = "JPEG"
     scene.render.image_settings.quality = 86
     scene.render.filepath = str(output / "thumbnail.jpg")
@@ -76,5 +86,6 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--faces", type=int, default=85000)
+    parser.add_argument("--card-only", action="store_true")
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:])
-    render(args.source.resolve(), args.output.resolve(), args.faces)
+    render(args.source.resolve(), args.output.resolve(), args.faces, args.card_only)

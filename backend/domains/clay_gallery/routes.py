@@ -76,8 +76,12 @@ def create_clay_gallery_blueprint(*, get_db, require_auth):
         response = Response(body.iter_chunks(64 * 1024), content_type=asset["content_type"])
         response.content_length = asset["size_bytes"]
         response.headers["X-Content-Type-Options"] = "nosniff"
-        max_age = 86400 if asset_type in {"display_model", "web_model"} else 300
-        response.headers["Cache-Control"] = f"public, max-age={max_age}"
+        if asset_type in {"gallery_poster", "model_thumbnail"}:
+            # Image URLs are versioned by the figure's updated timestamp in the
+            # UI, so immutable caching avoids repeating the R2 relay.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=86400"
         response.call_on_close(body.close)
         return response
 

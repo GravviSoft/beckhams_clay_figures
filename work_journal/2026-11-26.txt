@@ -288,6 +288,16 @@
 
 # AI Used: ChatGPT
 
+- Gallery card presentation and poster caching:
+  - Reason: The collection cards loaded slowly, looked dim and low quality, and a local Predator preview was clipped outside its image area.
+  - Investigation: Compared the supplied target and current screenshots with the rail grid, card image rules, asset loading attributes, poster response caching, and local thumbnail capture.
+  - Root cause: The rail compressed cards into two columns, saved posters were cropped, all local preview captures were enlarged inside an overflow-hidden frame, and versioned image responses expired from browser cache after five minutes.
+  - Change made: Switched the rail to one-column square gallery cards with the target border, title hierarchy, charcoal studio field, brighter image treatment, and full-figure `contain` framing. Removed local-thumbnail enlargement, prioritized the selected poster, decoded it asynchronously, and gave versioned poster responses long-lived immutable caching.
+- Files touched: `frontend/src/domains/clay_gallery/ClayGalleryPage.css`, `frontend/src/domains/clay_gallery/ClayGalleryPage.jsx`, `backend/domains/clay_gallery/routes.py`, and this journal.
+- Database changes or migrations applied: None.
+- Current blockers or risks: The image-generation attempt was rejected during output review, so the implementation continues to use the real saved sculpture poster. Cold requests still traverse the asset relay; the cache change primarily improves repeat visits.
+- Next steps: Verify the one-column rail and full Predator framing in a refreshed desktop and mobile browser.
+
 - Production mobile loading options:
   - Reason: Reported phone load exceeded 10 seconds.
   - Investigation: Timed parallel public requests for HTML, gallery JSON, Bowser thumbnail, optimized GLB, and viewer script. Reviewed the frontend dependency chain, the API-to-R2 delivery path, the existing publishing workflow, and Cloudflare and model-viewer documentation.

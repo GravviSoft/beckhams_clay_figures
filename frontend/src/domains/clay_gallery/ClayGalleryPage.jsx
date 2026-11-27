@@ -10,6 +10,13 @@ import ViewerControls from './ViewerControls';
 import './ClayGalleryPage.css';
 
 const localPreview = process.env.NODE_ENV === 'development';
+function studioPoster(item) {
+  if (!item?.assets?.some(({ asset_type }) => asset_type === 'web_model')
+      || item.assets.some(({ asset_type }) => asset_type === 'gallery_poster')) return undefined;
+  const filename = item.id === 1 && item.character_name === 'Bowser' ? 'bowser-studio-v1.webp'
+    : item.id === 2 && item.character_name === 'Predator 2' ? 'predator-2-studio-v1.webp' : null;
+  return filename ? `${process.env.PUBLIC_URL ?? ''}/gallery/${filename}` : undefined;
+}
 const viewerModule = 'https://cdn.jsdelivr.net/npm/@google/model-viewer@4.1.0/dist/model-viewer.min.js';
 let viewerReady;
 
@@ -47,7 +54,20 @@ function StageProgress({ label, progress = null }) {
   );
 }
 
-function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }) {
+function FigureTileInfo({ name, madeOn, description }) {
+  return (
+    <details className="clay-studio-tile-info">
+      <summary aria-label={`About ${name}`}><i className="pi pi-info" aria-hidden="true" /></summary>
+      <div>
+        <strong>{name}</strong>
+        {madeOn && <time dateTime={madeOn}>{madeOn}</time>}
+        {description && <p>{description}</p>}
+      </div>
+    </details>
+  );
+}
+
+function ModelPreview({ file, source, title, poster, onReady }) {
   const [url, setUrl] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [progress, setProgress] = useState(null);
@@ -60,8 +80,8 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
   useEffect(() => {
     if (loaded || error) return undefined;
     const timeout = window.setTimeout(() => {
-      setError('The model stopped loading. You can retry the download.');
-    }, 90000);
+      setError('The 3D model stopped making progress. Retry to open it again.');
+    }, 45000);
     return () => window.clearTimeout(timeout);
   }, [attempt, error, loaded, progress]);
 
@@ -119,6 +139,7 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
     viewerRef.current = element;
     if (!element) return;
     element.onload = () => {
+      setLoaded(true);
       const initialOrbit = element.getCameraOrbit();
       const target = element.getCameraTarget();
       originalView.current = {
@@ -127,18 +148,10 @@ function ModelPreview({ file, source, title, poster, captureThumbnail, onReady }
         'field-of-view': `${element.getFieldOfView()}deg`,
       };
       setOrbit(initialOrbit);
-      setLoaded(true);
       onReady?.(element);
-      if (captureThumbnail) {
-        try {
-          captureThumbnail(element.toDataURL('image/webp', 0.75));
-        } catch {
-          // Keep the filename visible if the renderer cannot capture an image.
-        }
-      }
     };
     element.onerror = () => setError('Try another GLB and check that your browser supports WebGL.');
-  }, [captureThumbnail, onReady]);
+  }, [onReady]);
 
   function setCameraGoal(element, attribute, value) {
     // A distinct attribute string reapplies the same goal after manual orbit or zoom.
@@ -190,6 +203,8 @@ export default function ClayGalleryPage() {
   const { signedIn, canFeature, editableFigureIds, markEditable, requestSignIn } = useOutletContext();
   const [params, setParams] = useSearchParams();
   const [figures, setFigures] = useState(null);
+  const [collectionSearch, setCollectionSearch] = useState('');
+  const [collectionSort, setCollectionSort] = useState('featured');
   const [error, setError] = useState('');
   const [previews, setPreviews] = useState([]);
   const [previewId, setPreviewId] = useState(null);
@@ -217,10 +232,32 @@ export default function ClayGalleryPage() {
   const hasModel = Boolean(modelAsset);
   const posterAsset = figure?.assets?.find(({ asset_type }) => asset_type === 'gallery_poster')
     ?? figure?.assets?.find(({ asset_type }) => asset_type === 'model_thumbnail');
-  const stagePoster = posterAsset
-    ? `${figureAssetUrl(figure.id, posterAsset.asset_type)}?v=${encodeURIComponent(figure.updated_at ?? '')}` : undefined;
+  const stagePoster = studioPoster(figure) ?? (posterAsset
+    ? `${figureAssetUrl(figure.id, posterAsset.asset_type)}?v=${encodeURIComponent(figure.updated_at ?? '')}` : undefined);
   const madeOn = preview ? preview.madeOn : figure?.made_on;
   const visibleFigureId = !preview && hasModel ? figure.id : null;
+  const collectionRows = [
+    ...previews.map((draft) => ({
+      key: `draft-${draft.id}`, draft, name: draft.name, madeOn: draft.madeOn,
+      featured: draft.id === featuredPreviewId,
+    })),
+    ...(figures ?? []).map((item) => {
+      const poster = item.assets?.find(({ asset_type }) => asset_type === 'gallery_poster')
+        ?? item.assets?.find(({ asset_type }) => asset_type === 'model_thumbnail');
+      return {
+        key: `saved-${item.id}`, item, name: item.character_name, madeOn: item.made_on,
+        addedOn: item.created_at, featured: item.featured && !featuredPreviewId,
+        legacyThumbnail: poster?.asset_type === 'model_thumbnail' && poster.content_type === 'image/jpeg',
+        thumbnail: poster && `${figureAssetUrl(item.id, poster.asset_type)}?v=${encodeURIComponent(item.updated_at ?? '')}`,
+      };
+    }),
+  ].filter((row) => row.name.toLowerCase().includes(collectionSearch.trim().toLowerCase()));
+  collectionRows.sort((a, b) => {
+    if (collectionSort === 'name') return a.name.localeCompare(b.name);
+    if (collectionSort === 'made') return (b.madeOn ?? '').localeCompare(a.madeOn ?? '');
+    if (collectionSort === 'added') return (b.addedOn ?? '').localeCompare(a.addedOn ?? '');
+    return Number(Boolean(b.featured)) - Number(Boolean(a.featured));
+  });
   const canGenerateThumbnail = editableFigureIds.includes(visibleFigureId)
     && !figure?.assets?.some(({ asset_type }) => ['gallery_poster', 'model_thumbnail'].includes(asset_type));
 
@@ -245,9 +282,16 @@ export default function ClayGalleryPage() {
   }, [persistThumbnail]);
 
   function rememberLocalThumbnail(id, viewer) {
-    if (signedIn && !localThumbnails.current.has(id)) {
-      localThumbnails.current.set(id, modelThumbnail(viewer).catch(() => null));
-    }
+    if (localThumbnails.current.has(id)) return;
+    const capture = modelThumbnail(viewer).catch(() => null);
+    localThumbnails.current.set(id, capture);
+    capture.then((image) => {
+      if (!image) return;
+      const reader = new FileReader();
+      reader.onload = () => setPreviews((items) => items.map((item) => item.id === id
+        ? { ...item, thumbnail: reader.result } : item));
+      reader.readAsDataURL(image);
+    });
   }
 
   function attachLocalThumbnail(draftId, figureId) {
@@ -277,7 +321,7 @@ export default function ClayGalleryPage() {
       })
       .catch((err) => { if (active) setError(err.message); });
     return () => { active = false; };
-  }, []);
+  }, [signedIn]);
 
   function chooseFile(event) {
     const persist = event.currentTarget === filePicker.current;
@@ -399,6 +443,20 @@ export default function ClayGalleryPage() {
     setEditId(null);
   }
 
+  function selectCollectionRow({ draft, item }) {
+    activeUpload.current = draft?.saving ? draft.id : null;
+    setMenuId(null);
+    setPreviewId(draft?.id ?? null);
+    if (item) {
+      setUploadedId(null);
+      setParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.set('figure', item.id);
+        return next;
+      }, { replace: true });
+    }
+  }
+
   return (
     <section className="clay-studio" aria-label="Clay figure gallery">
       <div className="clay-stage">
@@ -410,11 +468,7 @@ export default function ClayGalleryPage() {
         </header>
         <div className="clay-stage__view">
           {preview ? <ModelPreview key={preview.id} file={preview.file}
-            onReady={(element) => rememberLocalThumbnail(preview.id, element)}
-            captureThumbnail={preview.thumbnail ? undefined : (thumbnail) => {
-              setPreviews((items) => items.map((item) => item.id === preview.id
-                ? { ...item, thumbnail } : item));
-            }} /> : hasModel ? (
+            onReady={(element) => rememberLocalThumbnail(preview.id, element)} /> : hasModel ? (
               <ModelPreview key={`saved-${figure.id}-${modelAsset.asset_type}`} title={figure.character_name}
                 source={figureAssetUrl(figure.id, modelAsset.asset_type)} poster={stagePoster}
                 onReady={(element) => setThumbnailViewer({ id: figure.id, element })} />
@@ -461,11 +515,42 @@ export default function ClayGalleryPage() {
         {fileError && <p role="alert">{fileError}</p>}
         {error && <StatusState type="error" title="The gallery could not load" message={error} />}
         {featureError && <p role="alert">{featureError}</p>}
+        <div className="clay-collection-toolbar">
+          <input type="search" aria-label="Search figures" placeholder="Search figures"
+            value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} />
+          <details className="clay-collection-sort" onKeyDown={(event) => {
+            if (event.key !== 'Escape' || !event.currentTarget.open) return;
+            event.currentTarget.open = false;
+            event.currentTarget.querySelector('summary').focus();
+          }}>
+            <summary aria-label="Sort figures" title="Sort figures">
+              <i className="pi pi-filter-fill" aria-hidden="true" />
+            </summary>
+            <div className="clay-collection-sort__options">
+              {[
+                ['featured', 'Featured first'],
+                ['added', 'Recently added'],
+                ['name', 'Name A–Z'],
+                ['made', 'Date made'],
+              ].map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={collectionSort === value} onClick={(event) => {
+                  setCollectionSort(value);
+                  const sort = event.currentTarget.closest('details');
+                  sort.open = false;
+                  sort.querySelector('summary').focus();
+                }}>{label}</button>
+              ))}
+            </div>
+          </details>
+        </div>
+        {figures !== null && collectionRows.length === 0 && <p>No matching figures.</p>}
         <div className="clay-rail__grid">
-          {previews.map((draft) => {
+          {collectionRows.map((row) => {
+            const { draft, item } = row;
+            if (draft) {
             const { id, name, thumbnail, saving, saveError, needsSignIn, progress } = draft;
             return (
-            <article className={`clay-preview-card${featuredPreviewId === id ? ' clay-preview-card--featured' : ''}`} key={id}
+            <article className="clay-preview-card" key={row.key}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
                   setMenuId(null);
@@ -473,13 +558,13 @@ export default function ClayGalleryPage() {
                 }
               }}>
               <div className="clay-preview-card__body">
-              <button className="clay-preview-card__select" type="button" aria-pressed={previewId === id}
-                onClick={() => { activeUpload.current = saving ? id : null; setPreviewId(id); setMenuId(null); }}>
+              <button className="clay-preview-card__select" type="button" aria-label={name} aria-pressed={previewId === id}
+                onClick={() => selectCollectionRow(row)}>
                 <span className="clay-preview-card__image">
                   {thumbnail ? <img src={thumbnail} alt="" /> : <i className="pi pi-box" aria-hidden="true" />}
                 </span>
-                <span className="clay-preview-card__name" title={name}>{name}</span>
               </button>
+              <FigureTileInfo name={name} madeOn={draft.madeOn} description={draft.description} />
               {signedIn && <button className="clay-preview-card__star" type="button" title="Feature model"
                 aria-label={`Feature model: ${name}`} aria-pressed={featuredPreviewId === id}
                 onClick={() => { setFeaturedPreviewId(id); setPreviewId(id); }}>
@@ -514,42 +599,33 @@ export default function ClayGalleryPage() {
               </div>}
             </article>
           );
-          })}
-          {figures?.map((item) => {
+            }
             const canEdit = editableFigureIds.includes(item.id);
+            const transparentPoster = studioPoster(item);
+            const thumbnail = transparentPoster ?? row.thumbnail;
             const savedMenuId = `saved-${item.id}`;
             const menuOpen = menuId === savedMenuId;
-            const thumbnailType = item.assets?.some(({ asset_type }) => asset_type === 'gallery_poster')
-              ? 'gallery_poster'
-              : item.assets?.some(({ asset_type }) => asset_type === 'model_thumbnail') ? 'model_thumbnail' : null;
             return (
-            <article className={`clay-preview-card${item.featured && !featuredPreviewId ? ' clay-preview-card--featured' : ''}`} key={item.id}
+            <article className={`clay-preview-card${thumbnail && thumbnail.endsWith('/bowser-studio-v1.webp')
+              ? ' clay-preview-card--bowser-reference' : row.legacyThumbnail && !transparentPoster
+              ? ' clay-preview-card--legacy-thumbnail' : ''}`} key={row.key}
               onKeyDown={(event) => {
                 if (event.key === 'Escape' && menuOpen) {
                   setMenuId(null);
                   event.currentTarget.querySelector('.clay-preview-card__more')?.focus();
                 }
               }}>
-            <button className="clay-preview-card__select" type="button" aria-pressed={!preview && figure?.id === item.id}
-              onClick={() => {
-                activeUpload.current = null;
-                setParams((previous) => {
-                  const next = new URLSearchParams(previous);
-                  next.set('figure', item.id);
-                  return next;
-                }, { replace: true });
-                setPreviewId(null);
-                setUploadedId(null);
-                setMenuId(null);
-              }}>
+            <button className="clay-preview-card__select" type="button" aria-label={item.character_name} aria-pressed={!preview && figure?.id === item.id}
+              onClick={() => selectCollectionRow(row)}>
               <span className="clay-preview-card__image">
-                {thumbnailType
-                  ? <img className="clay-saved-poster" src={`${figureAssetUrl(item.id, thumbnailType)}?v=${encodeURIComponent(item.updated_at ?? '')}`}
-                    alt="" loading={item.id === figure?.id ? 'eager' : 'lazy'} />
+                {thumbnail
+                  ? <img src={thumbnail}
+                    alt="" loading={item.id === figure?.id ? 'eager' : 'lazy'}
+                    fetchPriority={item.id === figure?.id ? 'high' : 'auto'} decoding="async" />
                   : <i className="pi pi-box" aria-hidden="true" />}
               </span>
-              <span className="clay-preview-card__name" title={item.character_name}>{item.character_name}</span>
             </button>
+            <FigureTileInfo name={item.character_name} madeOn={item.made_on} description={item.description} />
             {canEdit && (
               <>
                 <button className="clay-preview-card__more" type="button" title="Figure options"

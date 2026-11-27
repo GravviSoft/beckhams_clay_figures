@@ -51,7 +51,7 @@ export async function saveFigure(form, onProgress) {
 
 export function saveModelThumbnail(id, thumbnail) {
   const form = new FormData();
-  form.set('thumbnail', thumbnail, 'model-preview.jpg');
+  form.set('thumbnail', thumbnail, 'model-preview.png');
   return apiJson(`/figures/${id}/thumbnail`, {
     method: 'PUT', body: form, redirectOnUnauthorized: false,
   });

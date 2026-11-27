@@ -16,6 +16,25 @@ beforeEach(() => {
   listFigures.mockResolvedValue([]);
 });
 
+test('collection search and sort apply to cards', async () => {
+  listFigures.mockResolvedValue([
+    { id: 1, character_name: 'Predator', assets: [{ asset_type: 'display_model' }] },
+    { id: 2, character_name: 'Bowser', assets: [] },
+  ]);
+  render(<MemoryRouter><App /></MemoryRouter>);
+  const collection = within(screen.getByRole('complementary', { name: 'Collection' }));
+  await collection.findByRole('button', { name: 'Bowser' });
+  const sort = collection.getByLabelText('Sort figures');
+  fireEvent.click(sort);
+  expect(sort.closest('details')).toHaveAttribute('open');
+  fireEvent.click(collection.getByRole('button', { name: 'Name A–Z' }));
+  expect(sort.closest('details')).not.toHaveAttribute('open');
+  expect(collection.getAllByRole('button', { name: /^(Bowser|Predator)$/ })[0]).toHaveAccessibleName('Bowser');
+  fireEvent.change(collection.getByRole('searchbox'), { target: { value: 'Bow' } });
+  expect(collection.getByRole('button', { name: 'Bowser' })).toBeInTheDocument();
+  expect(collection.queryByRole('button', { name: 'Predator' })).not.toBeInTheDocument();
+});
+
 test('a saved figure shows its thumbnail in the card and uses it on viewer failure', async () => {
   window.localStorage.clear();
   listFigures.mockResolvedValue([{
@@ -52,7 +71,7 @@ test('a saved figure shows its thumbnail in the card and uses it on viewer failu
   expect(screen.getByText('Preparing model… 100%')).toBeInTheDocument();
   fireEvent.error(viewer);
   expect(await screen.findByRole('img', { name: 'Bowser' })).toHaveAttribute(
-    'src', '/api/figures/1/assets/model_thumbnail?v=',
+    'src', '/gallery/bowser-studio-v1.webp',
   );
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retry model' })); });
   expect(screen.getByRole('progressbar', { name: 'Loading model' })).not.toHaveAttribute('value');

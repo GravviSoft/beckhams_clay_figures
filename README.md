@@ -306,6 +306,44 @@ Every error response is `{"error": {"code": "...", "message": "..."}}`.
 - Frontend tests must not depend on container environment variables; mock
   network modules explicitly.
 
+## Clay Gallery Visual Template
+
+The approved Bowser card is the visual reference for every collection card.
+Use the same layout for local previews, new uploads, and saved figures. Match
+new cards to Bowser and keep the reference card's styling fixed when extending
+the gallery.
+
+- **Card geometry.** Use a square tile with 16px rounded corners and 3px
+  artwork inset. Use the full tile for the figure. Place the info button in the
+  lower left, with the star and options in the upper and lower right when
+  available. Show the name and details through the info button.
+- **Backdrop.** Use the shared charcoal studio gradient for the 3D stage and
+  collection cards. The palette lives in
+  `frontend/src/domains/clay_gallery/ClayGalleryPage.css` as
+  `--clay-studio-light` (#454749), `--clay-studio-mid` (#2d2e30), and
+  `--clay-studio-dark` (#141415). Both surfaces use the Bowser tile’s
+  `--clay-studio-backdrop` gradient. CSS supplies the backdrop. Use transparent
+  PNG artwork for generated thumbnails so the gradient stays visible across
+  the tile. Render a transparent replacement from the source GLB when a legacy
+  thumbnail has an opaque matte.
+- **Underfoot lighting.** Match Bowser's low charcoal glow and soft ground
+  shadow. The backdrop is a radial ellipse centered at 50% horizontally and
+  87% vertically, fading to the dark tone at 76%. The separate shadow sits
+  behind the artwork near the bottom of the tile.
+- **Framing.** Center the entire figure and preserve its proportions. Fit tall
+  figures by height and wide figures by width, with visible space around the
+  head, feet, and any outstretched parts. For a square thumbnail, aim for the
+  figure's longest dimension to fill about 84% of the image. Keep labels and
+  controls clear of the figure. In the 3D stage, fit the whole model in the
+  available viewport at its initial camera angle.
+- **Delivery.** Use a small static poster for each collection card. Selecting a
+  figure starts its interactive 3D preview automatically, with progress over
+  the stage gradient. Use the optimized `web_model` when available and retain
+  the original GLB. A still image can serve as a fallback if the viewer fails.
+- **Review.** Compare Bowser (wide) and Predator 2 (tall) at desktop and phone
+  widths. Check for visible feet, clear space around controls, and a continuous
+  charcoal backdrop. Check the card again after saving and reloading.
+
 ## Frontend Loading-State Standard
 
 The development gallery at `/?preview=local` has a **Preview a local GLB** picker in the
