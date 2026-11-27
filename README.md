@@ -523,6 +523,13 @@ compiled SPA served by Nginx; `/api` has higher router priority and gzip
 compression. Production is served at
 `https://becksclay.gravvisoft.com`; its DNS record must resolve to the
 Traefik host before the first certificate request.
+Plain HTTP requests and the typo hostname `beckclay.gravvisoft.com` redirect
+to the canonical HTTPS hostname, preserving the path and query string.
+In GoDaddy DNS for `gravvisoft.com`, add a `CNAME` named `beckclay` pointing
+to `becksclay.gravvisoft.com` before applying the frontend router labels.
+Traefik needs a certificate covering the alias for Safari's HTTPS-first
+requests. Set `APP_ALIAS_DOMAIN` to the alias for another deployment, or to
+the same value as `APP_DOMAIN` if no separate alias is needed.
 
 ```bash
 cp .env.example .env    # set production values; chmod 600 .env

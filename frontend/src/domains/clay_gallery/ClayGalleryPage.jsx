@@ -744,7 +744,13 @@ export default function ClayGalleryPage() {
             <button className="clay-preview-card__select" type="button" aria-label={item.character_name} aria-pressed={!preview && figure?.id === item.id}
               onClick={() => selectCollectionRow(row)}>
               <span className="clay-preview-card__image">
-                {thumbnail
+                {transparentPoster ? (
+                  <picture className="clay-preview-card__poster">
+                    <source srcSet={transparentPoster} type="image/webp" />
+                    <img src={transparentPoster.replace(/\.webp$/, '.png')} alt=""
+                      loading={item.id === figure?.id ? 'eager' : 'lazy'} decoding="async" />
+                  </picture>
+                ) : thumbnail
                   ? <img src={thumbnail}
                     alt="" loading={item.id === figure?.id ? 'eager' : 'lazy'}
                     fetchPriority={item.id === figure?.id ? 'high' : 'auto'} decoding="async" />

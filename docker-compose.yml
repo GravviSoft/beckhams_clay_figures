@@ -47,6 +47,19 @@ services:
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.priority=10
       - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-web.service=${APP_SLUG:-becks-clay-figures}-web
       - traefik.http.services.${APP_SLUG:-becks-clay-figures}-web.loadbalancer.server.port=80
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-http-redirect.rule=Host(`${APP_DOMAIN:-becksclay.gravvisoft.com}`) || Host(`${APP_ALIAS_DOMAIN:-beckclay.gravvisoft.com}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-http-redirect.entrypoints=${TRAEFIK_PROD_HTTP_ENTRYPOINT:-web}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-http-redirect.middlewares=${APP_SLUG:-becks-clay-figures}-canonical
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-http-redirect.service=${APP_SLUG:-becks-clay-figures}-web
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.rule=Host(`${APP_ALIAS_DOMAIN:-beckclay.gravvisoft.com}`) && !Host(`${APP_DOMAIN:-becksclay.gravvisoft.com}`)
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.entrypoints=${TRAEFIK_PROD_ENTRYPOINT:-websecure}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.tls=true
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.middlewares=${APP_SLUG:-becks-clay-figures}-canonical
+      - traefik.http.routers.${APP_SLUG:-becks-clay-figures}-alias-redirect.service=${APP_SLUG:-becks-clay-figures}-web
+      - traefik.http.middlewares.${APP_SLUG:-becks-clay-figures}-canonical.redirectregex.regex=^https?://[^/?]+(.*)
+      - traefik.http.middlewares.${APP_SLUG:-becks-clay-figures}-canonical.redirectregex.replacement=https://${APP_DOMAIN:-becksclay.gravvisoft.com}$${1}
+      - traefik.http.middlewares.${APP_SLUG:-becks-clay-figures}-canonical.redirectregex.permanent=true
 
   gallery-worker:
     profiles: ["gallery-assets"]

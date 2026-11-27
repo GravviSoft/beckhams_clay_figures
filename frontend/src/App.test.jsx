@@ -62,11 +62,15 @@ test('Bowser loads the bundled 3D model and can retry from the saved model endpo
   expect(screen.queryByRole('img', { name: 'Bowser' })).not.toBeInTheDocument();
   const card = screen.getByRole('button', { name: 'Bowser' });
   expect(card.querySelector('img')).toHaveAttribute('loading', 'eager');
+  expect(card.querySelector('img')).toHaveAttribute('src', '/gallery/bowser-studio-v1.png');
+  expect(card.querySelector('source')).toHaveAttribute('type', 'image/webp');
   await waitFor(() => expect(document.head.querySelector('link[as="fetch"]')).toHaveAttribute(
     'href', '/gallery/bowser-web-v1.glb',
   ));
   const viewerDefinition = jest.spyOn(customElements, 'get').mockReturnValue(class extends HTMLElement {});
-  fireEvent.load(document.head.querySelector('script[type="module"]'));
+  await act(async () => {
+    fireEvent.load(document.head.querySelector('script[type="module"]'));
+  });
   viewerDefinition.mockRestore();
   const viewer = await waitFor(() => {
     const element = document.querySelector('model-viewer');
